@@ -1,0 +1,4 @@
+{"question":"学生证丢失后如何补办？","reference_answer":"向学生事务中心提交补办申请并携带身份证明。","relevant_document":"学生手册.pdf","relevant_pages":[12],"should_refuse":false}
+{"question":"图书馆工作日几点开放？","reference_answer":"图书馆工作日 8:00 开放。","relevant_document":"图书馆指南.pdf","relevant_pages":[3],"should_refuse":false}
+{"question":"学校附近哪家火锅店最好吃？","reference_answer":"当前校园资料无法确定。","relevant_document":null,"relevant_pages":[],"should_refuse":true}
+{"question":"奖学金申请截止日期是哪一天？","reference_answer":"当前示例资料没有提供截止日期。","relevant_document":null,"relevant_pages":[],"should_refuse":true}
