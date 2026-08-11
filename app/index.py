@@ -31,7 +31,10 @@ def create_embeddings(settings: Settings):
         from langchain_huggingface import HuggingFaceEmbeddings
     except ImportError as exc:  # pragma: no cover
         raise IndexUnavailableError("缺少 langchain-huggingface，请安装项目依赖") from exc
-    return HuggingFaceEmbeddings(model_name=settings.embedding_model)
+    return HuggingFaceEmbeddings(
+        model_name=settings.embedding_model,
+        encode_kwargs={"normalize_embeddings": True},
+    )
 
 
 def open_vectorstore(settings: Settings, embeddings: Any | None = None):
@@ -44,6 +47,7 @@ def open_vectorstore(settings: Settings, embeddings: Any | None = None):
         collection_name=settings.collection_name,
         persist_directory=str(settings.index_dir),
         embedding_function=embeddings or create_embeddings(settings),
+        collection_metadata={"hnsw:space": settings.distance_metric},
     )
 
 
@@ -62,12 +66,26 @@ def _chunk_id(file_hash: str, page: int, chunk_index: int, text: str) -> str:
     return sha256(value).hexdigest()
 
 
+def index_configuration(settings: Settings) -> dict[str, Any]:
+    """Configuration that changes the meaning or shape of stored vectors."""
+    return {
+        "collection_name": settings.collection_name,
+        "distance_metric": settings.distance_metric,
+        "embedding_model": settings.embedding_model,
+        "normalize_embeddings": True,
+        "chunk_size": settings.chunk_size,
+        "chunk_overlap": settings.chunk_overlap,
+    }
+
+
 def build_index(settings: Settings, source_dir: Path | None = None) -> IndexReport:
     source_dir = source_dir or settings.data_dir
     source_dir.mkdir(parents=True, exist_ok=True)
     settings.index_dir.mkdir(parents=True, exist_ok=True)
     manifest_path = settings.index_dir / MANIFEST_NAME
     manifest = _load_manifest(manifest_path)
+    current_configuration = index_configuration(settings)
+    configuration_changed = manifest.get("index_configuration") != current_configuration
     documents_manifest: dict[str, Any] = manifest.setdefault("documents", {})
     report = IndexReport()
     vectorstore = None
@@ -81,7 +99,7 @@ def build_index(settings: Settings, source_dir: Path | None = None) -> IndexRepo
         try:
             current_hash = file_sha256(path)
             old_entry = documents_manifest.get(key)
-            if old_entry and old_entry.get("sha256") == current_hash:
+            if not configuration_changed and old_entry and old_entry.get("sha256") == current_hash:
                 report.skipped_documents += 1
                 continue
             chunks, warnings = load_and_split_pdf(path, settings.chunk_size, settings.chunk_overlap)
@@ -109,5 +127,7 @@ def build_index(settings: Settings, source_dir: Path | None = None) -> IndexRepo
             report.warnings.append(message)
             logger.exception("document_index_failed")
 
+    manifest["version"] = 2
+    manifest["index_configuration"] = current_configuration
     manifest_path.write_text(json.dumps(manifest, ensure_ascii=False, indent=2), encoding="utf-8")
     return report

@@ -4,6 +4,8 @@ from __future__ import annotations
 
 from typing import Any, Protocol
 
+import requests
+
 from app.config import Settings
 from app.exceptions import GenerationUnavailableError
 from app.models import ChatResponse, RetrievedEvidence, SourceResponse
@@ -13,6 +15,37 @@ REFUSAL_ANSWER = "根据当前校园资料无法确定这个问题，请联系�
 
 class TextGenerator(Protocol):
     def invoke(self, prompt: str) -> Any: ...
+
+
+class OpenAICompatibleChatModel:
+    """Minimal client for SiliconFlow, NVIDIA NIM and compatible chat endpoints."""
+
+    def __init__(self, api_key: str, base_url: str, model: str, timeout: float):
+        self.api_key = api_key
+        self.endpoint = f"{base_url.rstrip('/')}/chat/completions"
+        self.model = model
+        self.timeout = timeout
+
+    def invoke(self, prompt: str) -> str:
+        try:
+            response = requests.post(
+                self.endpoint,
+                headers={"Authorization": f"Bearer {self.api_key}", "Content-Type": "application/json"},
+                json={
+                    "model": self.model,
+                    "messages": [{"role": "user", "content": prompt}],
+                    "temperature": 0,
+                    "stream": False,
+                },
+                timeout=self.timeout,
+            )
+            response.raise_for_status()
+            payload = response.json()
+            return str(payload["choices"][0]["message"]["content"])
+        except (requests.RequestException, KeyError, IndexError, TypeError, ValueError) as exc:
+            status = getattr(getattr(exc, "response", None), "status_code", None)
+            suffix = f"（HTTP {status}）" if status else ""
+            raise GenerationUnavailableError(f"OpenAI-compatible 模型调用失败{suffix}") from exc
 
 
 def citation_label(document: str, page: int) -> str:
@@ -48,14 +81,27 @@ class AnswerGenerator:
     def _get_model(self) -> TextGenerator:
         if self.model is not None:
             return self.model
-        if not self.settings.groq_api_key:
-            raise GenerationUnavailableError("未配置 GROQ_API_KEY，无法调用在线回答模型")
+        if self.settings.llm_provider in {"siliconflow", "nvidia", "openai", "openai-compatible"}:
+            if not self.settings.llm_api_key or not self.settings.llm_base_url:
+                raise GenerationUnavailableError("未配置 LLM_API_KEY 或 LLM_BASE_URL，无法调用在线模型")
+            self.model = OpenAICompatibleChatModel(
+                api_key=self.settings.llm_api_key,
+                base_url=self.settings.llm_base_url,
+                model=self.settings.llm_model,
+                timeout=self.settings.llm_timeout,
+            )
+            return self.model
+        if self.settings.llm_provider != "groq":
+            raise GenerationUnavailableError(f"不支持的 LLM_PROVIDER: {self.settings.llm_provider}")
+        groq_key = self.settings.groq_api_key or self.settings.llm_api_key
+        if not groq_key:
+            raise GenerationUnavailableError("未配置 GROQ_API_KEY 或 LLM_API_KEY，无法调用 Groq 模型")
         try:
             from langchain_groq import ChatGroq
         except ImportError as exc:  # pragma: no cover
             raise GenerationUnavailableError("缺少 langchain-groq，请安装项目依赖") from exc
         self.model = ChatGroq(
-            api_key=self.settings.groq_api_key,
+            api_key=groq_key,
             model=self.settings.llm_model,
             temperature=0,
         )

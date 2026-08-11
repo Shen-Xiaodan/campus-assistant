@@ -1,5 +1,8 @@
+import pytest
+
+from app.config import Settings
 from app.models import RetrievedEvidence
-from app.retrieval import deduplicate_evidence, keyword_score
+from app.retrieval import CampusRetriever, deduplicate_evidence, distance_to_relevance, keyword_score
 
 
 def evidence(text: str, score: float, page: int = 1) -> RetrievedEvidence:
@@ -23,3 +26,36 @@ def test_keyword_score_prefers_matching_chinese_text():
     assert keyword_score("学生证如何补办", "学生证丢失后可以申请补办") > keyword_score(
         "学生证如何补办", "图书馆开放时间"
     )
+
+
+def test_cosine_distance_is_converted_to_bounded_relevance():
+    assert distance_to_relevance(0.18, "cosine") == pytest.approx(0.82)
+    assert distance_to_relevance(1.5, "cosine") == 0.0
+    assert distance_to_relevance(-1, "cosine") == 1.0
+
+
+class FakeDocument:
+    def __init__(self, text: str, page: int):
+        self.page_content = text
+        self.metadata = {"document": "培养方案.pdf", "page": page}
+
+
+class FakeVectorstore:
+    def similarity_search_with_score(self, query: str, k: int):
+        assert query == "Visual Analytics 的课程代码是什么？"
+        assert k == 4
+        return [
+            (FakeDocument("Visual Analytics 的课程代码是 DDA3003。", 3), 0.12),
+            (FakeDocument("不相关内容", 7), 0.9),
+        ]
+
+    def get(self, include):
+        return {"documents": [], "metadatas": []}
+
+
+def test_retriever_uses_raw_cosine_distance_before_thresholding():
+    settings = Settings(top_k=2, fetch_k=4, similarity_threshold=0.45, hybrid_search=False)
+    results = CampusRetriever(FakeVectorstore(), settings).retrieve("Visual Analytics 的课程代码是什么？")
+    assert len(results) == 1
+    assert results[0].page == 3
+    assert results[0].score == 0.88

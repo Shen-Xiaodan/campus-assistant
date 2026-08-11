@@ -37,6 +37,20 @@ def deduplicate_evidence(items: Iterable[RetrievedEvidence], top_k: int) -> list
     return sorted(best.values(), key=lambda item: item.score, reverse=True)[:top_k]
 
 
+def distance_to_relevance(distance: float, metric: str) -> float:
+    """Convert Chroma's lower-is-better raw distance to a bounded relevance score."""
+    distance = max(0.0, float(distance))
+    if metric == "cosine":
+        score = 1.0 - distance
+    elif metric == "l2":
+        score = 1.0 / (1.0 + distance)
+    elif metric == "ip":
+        score = 1.0 - distance
+    else:
+        raise ValueError(f"不支持的距离类型: {metric}")
+    return max(0.0, min(1.0, score))
+
+
 class CampusRetriever:
     def __init__(self, vectorstore: Any, settings: Settings):
         self.vectorstore = vectorstore
@@ -54,10 +68,11 @@ class CampusRetriever:
         )
 
     def retrieve(self, query: str) -> list[RetrievedEvidence]:
-        vector_results = self.vectorstore.similarity_search_with_relevance_scores(query, k=self.settings.fetch_k)
+        vector_results = self.vectorstore.similarity_search_with_score(query, k=self.settings.fetch_k)
         merged: list[RetrievedEvidence] = []
         seen_texts: set[str] = set()
-        for document, vector_score in vector_results:
+        for document, distance in vector_results:
+            vector_score = distance_to_relevance(distance, self.settings.distance_metric)
             lexical = keyword_score(query, document.page_content) if self.settings.hybrid_search else 0.0
             combined = (
                 0.75 * float(vector_score) + 0.25 * lexical if self.settings.hybrid_search else float(vector_score)

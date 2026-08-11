@@ -1,5 +1,5 @@
 from app.config import Settings
-from app.generation import REFUSAL_ANSWER, AnswerGenerator, citation_label
+from app.generation import REFUSAL_ANSWER, AnswerGenerator, OpenAICompatibleChatModel, citation_label
 from app.models import RetrievedEvidence
 
 
@@ -27,3 +27,26 @@ def test_grounded_answer_returns_bounded_sources():
     assert result.sources[0].document == "学生手册.pdf"
     assert result.sources[0].page == 12
     assert len(result.sources[0].excerpt) <= 30
+
+
+def test_openai_compatible_provider_request(monkeypatch):
+    captured = {}
+
+    class FakeResponse:
+        def raise_for_status(self):
+            return None
+
+        def json(self):
+            return {"choices": [{"message": {"content": "基于资料的回答"}}]}
+
+    def fake_post(url, headers, json, timeout):
+        captured.update(url=url, headers=headers, json=json, timeout=timeout)
+        return FakeResponse()
+
+    monkeypatch.setattr("app.generation.requests.post", fake_post)
+    model = OpenAICompatibleChatModel("secret-not-printed", "https://api.siliconflow.cn/v1", "demo/model", 30)
+    assert model.invoke("校园问题") == "基于资料的回答"
+    assert captured["url"] == "https://api.siliconflow.cn/v1/chat/completions"
+    assert captured["json"]["model"] == "demo/model"
+    assert captured["json"]["messages"][0]["content"] == "校园问题"
+    assert captured["timeout"] == 30

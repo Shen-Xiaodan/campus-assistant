@@ -20,8 +20,13 @@ class Settings:
     data_dir: Path = PROJECT_ROOT / "data"
     index_dir: Path = PROJECT_ROOT / "vector_db_dir"
     collection_name: str = "campus_documents"
+    distance_metric: str = "cosine"
     embedding_model: str = "sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2"
+    llm_provider: str = "groq"
     llm_model: str = "llama-3.3-70b-versatile"
+    llm_api_key: str | None = None
+    llm_base_url: str | None = None
+    llm_timeout: float = 120.0
     groq_api_key: str | None = None
     chunk_size: int = 1000
     chunk_overlap: int = 150
@@ -46,8 +51,13 @@ class Settings:
             data_dir=Path(os.getenv("DATA_DIR", str(PROJECT_ROOT / "data"))).expanduser().resolve(),
             index_dir=Path(os.getenv("INDEX_DIR", str(PROJECT_ROOT / "vector_db_dir"))).expanduser().resolve(),
             collection_name=os.getenv("CHROMA_COLLECTION", defaults.collection_name),
+            distance_metric=os.getenv("DISTANCE_METRIC", defaults.distance_metric).strip().lower(),
             embedding_model=os.getenv("EMBEDDING_MODEL", defaults.embedding_model),
-            llm_model=os.getenv("LLM_MODEL", defaults.llm_model),
+            llm_provider=os.getenv("LLM_PROVIDER", defaults.llm_provider).strip().lower(),
+            llm_model=os.getenv("LLM_MODEL_ID") or os.getenv("LLM_MODEL", defaults.llm_model),
+            llm_api_key=os.getenv("LLM_API_KEY") or os.getenv("GROQ_API_KEY") or None,
+            llm_base_url=os.getenv("LLM_BASE_URL") or None,
+            llm_timeout=float(os.getenv("LLM_TIMEOUT", str(defaults.llm_timeout))),
             groq_api_key=os.getenv("GROQ_API_KEY") or None,
             chunk_size=int(os.getenv("CHUNK_SIZE", str(defaults.chunk_size))),
             chunk_overlap=int(os.getenv("CHUNK_OVERLAP", str(defaults.chunk_overlap))),
@@ -66,3 +76,7 @@ class Settings:
             raise ValueError("TOP_K 必须大于 0，且 FETCH_K 不能小于 TOP_K")
         if not 0 <= self.similarity_threshold <= 1:
             raise ValueError("SIMILARITY_THRESHOLD 必须位于 0 到 1 之间")
+        if self.distance_metric not in {"cosine", "l2", "ip"}:
+            raise ValueError("DISTANCE_METRIC 只支持 cosine、l2 或 ip")
+        if self.llm_timeout <= 0:
+            raise ValueError("LLM_TIMEOUT 必须大于 0")

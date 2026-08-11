@@ -12,7 +12,7 @@
 - Chroma 持久化向量索引，索引构建与问答服务解耦
 - 多语言 HuggingFace Embeddings
 - 向量相关度与轻量关键词相关度融合、结果去重和阈值过滤
-- Groq 托管 LLM 生成受证据约束的回答
+- 硅基流动 OpenAI-compatible 模型生成受证据约束的回答，并保留 NVIDIA/Groq 兼容分支
 - 文档名、页码、短证据片段及多个引用
 - 低相关度自动拒答，不调用模型猜测答案
 - FastAPI 结构化接口与 Streamlit 对话界面
@@ -40,7 +40,7 @@ flowchart LR
         Chroma --> Retrieve
         Retrieve --> Gate{证据超过阈值?}
         Gate -- 否 --> Refuse[明确拒答]
-        Gate -- 是 --> LLM[Groq LLM]
+        Gate -- 是 --> LLM[SiliconFlow OpenAI-compatible LLM]
         LLM --> Result[答案 + 多个引用]
         Result --> UI
     end
@@ -76,7 +76,7 @@ vector_db_dir/         # 本地索引（默认不提交）
 - Streamlit
 - LangChain integrations、Chroma
 - HuggingFace Sentence Transformers
-- Groq Chat API
+- 硅基流动 OpenAI-compatible Chat API（兼容可选 NVIDIA/Groq 配置）
 - pypdf
 - pytest、Ruff
 
@@ -91,7 +91,7 @@ pip install -r requirements.txt
 cp .env.example .env
 ```
 
-在 `.env` 中填入自己的 `GROQ_API_KEY`。`.env` 已被忽略；不要把真实密钥提交、打印或写进源代码。首次建立索引时，HuggingFace 模型会从网络下载并缓存。
+在 `.env` 中填入自己的 `LLM_API_KEY`，并配置 `LLM_PROVIDER`、`LLM_BASE_URL` 和 `LLM_MODEL_ID`。默认示例使用硅基流动中国站的 OpenAI-compatible endpoint `https://api.siliconflow.cn/v1`；国际站账号应改用对应的 `.com` 地址。`.env` 已被忽略；不要把真实密钥提交、打印或写进源代码。首次建立索引时，HuggingFace 模型会从网络下载并缓存。
 
 ### 2. 添加资料并构建索引
 
@@ -154,7 +154,7 @@ curl -X POST http://127.0.0.1:8000/chat \
 
 ## 配置
 
-所有运行参数见 `.env.example`。常用参数包括 `EMBEDDING_MODEL`、`LLM_MODEL`、`CHUNK_SIZE`、`CHUNK_OVERLAP`、`TOP_K`、`FETCH_K`、`SIMILARITY_THRESHOLD` 和 `HYBRID_SEARCH`。修改 embedding 模型或切分参数后，建议使用新的空 `INDEX_DIR` 重新构建索引，以免混用不兼容向量。
+所有运行参数见 `.env.example`。常用参数包括 `EMBEDDING_MODEL`、`LLM_MODEL`、`DISTANCE_METRIC`、`CHUNK_SIZE`、`CHUNK_OVERLAP`、`TOP_K`、`FETCH_K`、`SIMILARITY_THRESHOLD` 和 `HYBRID_SEARCH`。默认使用归一化 embedding 与 cosine 距离；修改 embedding 模型、距离类型或切分参数后，应使用新的空 `INDEX_DIR` 重新构建索引，以免混用不兼容向量。索引 manifest 会记录这些配置，并在模型或切分配置变化时重新处理文档。
 
 ## 测试与评测
 
@@ -167,7 +167,7 @@ ruff check .
 python -m app.evaluate
 ```
 
-单元测试中的模型和服务调用使用 fake/mock，不需要 Groq Key。离线评测使用 `evaluation/dataset.jsonl` 与 `evaluation/sample_corpus.json`，输出：
+单元测试中的模型和服务调用使用 fake/mock，不需要硅基流动、NVIDIA 或 Groq Key。离线评测使用 `evaluation/dataset.jsonl` 与 `evaluation/sample_corpus.json`，输出：
 
 - 检索命中率
 - 引用正确率
