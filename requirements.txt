@@ -4,6 +4,7 @@ streamlit==1.48.1
 pydantic==2.11.7
 python-dotenv==1.1.1
 requests==2.32.4
+opencc-python-reimplemented==0.1.7
 pypdf==5.9.0
 langchain-core==0.3.74
 langchain-chroma==0.2.5

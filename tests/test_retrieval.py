@@ -2,7 +2,14 @@ import pytest
 
 from app.config import Settings
 from app.models import RetrievedEvidence
-from app.retrieval import CampusRetriever, deduplicate_evidence, distance_to_relevance, keyword_score
+from app.retrieval import (
+    CampusRetriever,
+    deduplicate_evidence,
+    distance_to_relevance,
+    expand_query,
+    keyword_score,
+    normalize_search_text,
+)
 
 
 def evidence(text: str, score: float, page: int = 1) -> RetrievedEvidence:
@@ -26,6 +33,20 @@ def test_keyword_score_prefers_matching_chinese_text():
     assert keyword_score("学生证如何补办", "学生证丢失后可以申请补办") > keyword_score(
         "学生证如何补办", "图书馆开放时间"
     )
+
+
+def test_search_text_normalizes_traditional_chinese():
+    assert normalize_search_text("電子遊戲設計與開發") == "电子游戏设计与开发"
+
+
+def test_query_expansion_adds_chinese_english_course_aliases():
+    game_variants = expand_query("有没有游戏制作课程")
+    bio_variants = expand_query("bio相关课程")
+
+    assert "video games design and development" in game_variants
+    assert "电子游戏设计与开发" in game_variants
+    assert "life sciences" in bio_variants
+    assert "生命科学" in bio_variants
 
 
 def test_cosine_distance_is_converted_to_bounded_relevance():

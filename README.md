@@ -154,7 +154,7 @@ curl -X POST http://127.0.0.1:8000/chat \
 
 ## 配置
 
-所有运行参数见 `.env.example`。常用参数包括 `EMBEDDING_MODEL`、`LLM_MODEL`、`DISTANCE_METRIC`、`CHUNK_SIZE`、`CHUNK_OVERLAP`、`TOP_K`、`FETCH_K`、`SIMILARITY_THRESHOLD` 和 `HYBRID_SEARCH`。默认使用归一化 embedding 与 cosine 距离；修改 embedding 模型、距离类型或切分参数后，应使用新的空 `INDEX_DIR` 重新构建索引，以免混用不兼容向量。索引 manifest 会记录这些配置，并在模型或切分配置变化时重新处理文档。
+所有运行参数见 `.env.example`。常用参数包括 `EMBEDDING_MODEL`、`LLM_MODEL`、`DISTANCE_METRIC`、`CHUNK_SIZE`、`CHUNK_OVERLAP`、`TOP_K`、`FETCH_K`、`SIMILARITY_THRESHOLD`、`KEYWORD_BONUS_WEIGHT` 和 `HYBRID_SEARCH`。默认阈值为 `0.40`；向量相关度是基础分，关键词命中只作为加分项，避免词面不一致时反向压低向量结果。查询会先统一为简体中文进行词面匹配，并为已配置的校园领域概念补充简体、繁体和英文别名。默认使用归一化 embedding 与 cosine 距离；修改 embedding 模型、距离类型或切分参数后，应使用新的空 `INDEX_DIR` 重新构建索引，以免混用不兼容向量。索引 manifest 会记录这些配置，并在模型或切分配置变化时重新处理文档。
 
 ## 测试与评测
 
@@ -180,7 +180,7 @@ python -m app.evaluate
 
 - 扫描版 PDF 尚未集成 OCR；系统会提示页面无文本，需要预先 OCR。
 - PDF 表格和复杂多栏排版依赖 `pypdf` 的提取效果。
-- 关键词检索是轻量 token-overlap，与向量结果融合，并非完整 BM25 索引。
+- 关键词检索是轻量 token-overlap，与向量结果融合，并非完整 BM25 索引；中英同义词表以实际评测失败为依据维护，目前并非通用翻译词典。
 - 当前不保存跨会话聊天历史；每个问题独立检索，减少历史内容污染证据。
 - 模型输出仍可能出现措辞偏差；来源卡片用于人工核对，不应替代原始规章。
 - 索引删除检测尚未实现：从数据目录移除 PDF 不会自动清理其旧向量。

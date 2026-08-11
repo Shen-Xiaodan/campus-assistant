@@ -32,7 +32,8 @@ class Settings:
     chunk_overlap: int = 150
     top_k: int = 4
     fetch_k: int = 12
-    similarity_threshold: float = 0.45
+    similarity_threshold: float = 0.40
+    keyword_bonus_weight: float = 0.25
     hybrid_search: bool = True
     max_excerpt_chars: int = 240
     log_level: str = "INFO"
@@ -64,6 +65,7 @@ class Settings:
             top_k=int(os.getenv("TOP_K", str(defaults.top_k))),
             fetch_k=int(os.getenv("FETCH_K", str(defaults.fetch_k))),
             similarity_threshold=float(os.getenv("SIMILARITY_THRESHOLD", str(defaults.similarity_threshold))),
+            keyword_bonus_weight=float(os.getenv("KEYWORD_BONUS_WEIGHT", str(defaults.keyword_bonus_weight))),
             hybrid_search=_env_bool("HYBRID_SEARCH", defaults.hybrid_search),
             max_excerpt_chars=int(os.getenv("MAX_EXCERPT_CHARS", str(defaults.max_excerpt_chars))),
             log_level=os.getenv("LOG_LEVEL", defaults.log_level),
@@ -76,6 +78,8 @@ class Settings:
             raise ValueError("TOP_K 必须大于 0，且 FETCH_K 不能小于 TOP_K")
         if not 0 <= self.similarity_threshold <= 1:
             raise ValueError("SIMILARITY_THRESHOLD 必须位于 0 到 1 之间")
+        if not 0 <= self.keyword_bonus_weight <= 1:
+            raise ValueError("KEYWORD_BONUS_WEIGHT 必须位于 0 到 1 之间")
         if self.distance_metric not in {"cosine", "l2", "ip"}:
             raise ValueError("DISTANCE_METRIC 只支持 cosine、l2 或 ip")
         if self.llm_timeout <= 0:

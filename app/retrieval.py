@@ -3,15 +3,63 @@
 from __future__ import annotations
 
 import re
+import unicodedata
 from collections import Counter
 from typing import Any, Iterable
+
+from opencc import OpenCC
 
 from app.config import Settings
 from app.models import RetrievedEvidence
 
+_T2S = OpenCC("t2s")
+
+# Query variants are intentionally small and domain-oriented. Add new groups as
+# real evaluation failures are discovered instead of asking the LLM to rewrite
+# every query before retrieval.
+QUERY_SYNONYM_GROUPS: tuple[tuple[str, ...], ...] = (
+    (
+        "游戏",
+        "游戏制作",
+        "游戏开发",
+        "游戏设计",
+        "电子游戏设计与开发",
+        "game development",
+        "game design",
+        "video games design and development",
+    ),
+    (
+        "bio",
+        "生物",
+        "生命科学",
+        "化学与生命科学",
+        "biology",
+        "biological sciences",
+        "life sciences",
+    ),
+)
+
+
+def normalize_search_text(text: str) -> str:
+    normalized = unicodedata.normalize("NFKC", text).lower()
+    return re.sub(r"\s+", " ", _T2S.convert(normalized)).strip()
+
+
+def expand_query(query: str) -> list[str]:
+    """Return original query plus Chinese/English variants for matched concepts."""
+    normalized_query = normalize_search_text(query)
+    variants = [query]
+    for group in QUERY_SYNONYM_GROUPS:
+        normalized_group = [normalize_search_text(item) for item in group]
+        if any(
+            re.search(rf"(?<![a-z0-9]){re.escape(item)}(?![a-z0-9])", normalized_query) for item in normalized_group
+        ):
+            variants.extend(group)
+    return list(dict.fromkeys(variants))
+
 
 def _tokens(text: str) -> list[str]:
-    lowered = text.lower()
+    lowered = normalize_search_text(text)
     latin = re.findall(r"[a-z0-9]{2,}", lowered)
     chinese = re.findall(r"[\u4e00-\u9fff]", lowered)
     bigrams = ["".join(chinese[index : index + 2]) for index in range(max(0, len(chinese) - 1))]
@@ -68,15 +116,26 @@ class CampusRetriever:
         )
 
     def retrieve(self, query: str) -> list[RetrievedEvidence]:
-        vector_results = self.vectorstore.similarity_search_with_score(query, k=self.settings.fetch_k)
+        query_variants = expand_query(query)
+        vector_results: dict[tuple[str, int, str], tuple[Any, float]] = {}
+        for variant in query_variants:
+            for document, distance in self.vectorstore.similarity_search_with_score(variant, k=self.settings.fetch_k):
+                metadata = document.metadata or {}
+                key = (str(metadata.get("document", "")), int(metadata.get("page", 1)), document.page_content)
+                relevance = distance_to_relevance(distance, self.settings.distance_metric)
+                previous = vector_results.get(key)
+                if previous is None or relevance > previous[1]:
+                    vector_results[key] = (document, relevance)
+
         merged: list[RetrievedEvidence] = []
         seen_texts: set[str] = set()
-        for document, distance in vector_results:
-            vector_score = distance_to_relevance(distance, self.settings.distance_metric)
-            lexical = keyword_score(query, document.page_content) if self.settings.hybrid_search else 0.0
-            combined = (
-                0.75 * float(vector_score) + 0.25 * lexical if self.settings.hybrid_search else float(vector_score)
+        for document, vector_score in vector_results.values():
+            lexical = (
+                max(keyword_score(variant, document.page_content) for variant in query_variants)
+                if self.settings.hybrid_search
+                else 0.0
             )
+            combined = min(1.0, vector_score + self.settings.keyword_bonus_weight * lexical)
             evidence = self._evidence(document, combined)
             merged.append(evidence)
             seen_texts.add(document.page_content)
@@ -85,10 +144,10 @@ class CampusRetriever:
             raw = self.vectorstore.get(include=["documents", "metadatas"])
             keyword_candidates: list[RetrievedEvidence] = []
             for text, metadata in zip(raw.get("documents", []), raw.get("metadatas", []), strict=False):
-                score = keyword_score(query, text)
+                score = max(keyword_score(variant, text) for variant in query_variants)
                 if score > 0 and text not in seen_texts:
                     holder = type("Document", (), {"page_content": text, "metadata": metadata})()
-                    keyword_candidates.append(self._evidence(holder, score * 0.65))
+                    keyword_candidates.append(self._evidence(holder, score))
             merged.extend(
                 sorted(keyword_candidates, key=lambda item: item.score, reverse=True)[: self.settings.fetch_k]
             )
