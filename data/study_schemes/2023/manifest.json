@@ -1,0 +1,281 @@
+[
+  {
+    "major": "大数据管理与应用",
+    "page_url": "https://registry.cuhk.edu.cn/page/363",
+    "status": "not_found",
+    "title": null,
+    "pdf_url": null,
+    "path": null,
+    "error": null
+  },
+  {
+    "major": "经济学",
+    "page_url": "https://registry.cuhk.edu.cn/page/65",
+    "status": "downloaded",
+    "title": "经济学_适用于2023至24年度入学学生.pdf",
+    "pdf_url": "https://registry.cuhk.edu.cn/sites/default/files/2024-12/Study%20Scheme%20-%20ECON_2023-24_Circular%28AB2024_C049%29.pdf",
+    "path": "data/study_schemes/2023/经济学_适用于2023至24年度入学学生.pdf",
+    "error": null
+  },
+  {
+    "major": "金融学",
+    "page_url": "https://registry.cuhk.edu.cn/page/64",
+    "status": "downloaded",
+    "title": "金融学_适用于2023至24年度入学学生.pdf",
+    "pdf_url": "https://registry.cuhk.edu.cn/sites/default/files/2024-12/Study%20Scheme%20-%20FINA_2023-24_Circular%28AB2024_C049%29.pdf",
+    "path": "data/study_schemes/2023/金融学_适用于2023至24年度入学学生.pdf",
+    "error": null
+  },
+  {
+    "major": "国际商务",
+    "page_url": "https://registry.cuhk.edu.cn/page/66",
+    "status": "downloaded",
+    "title": "国际商务_适用于2022至23年度及2023至24年度入学学生.pdf",
+    "pdf_url": "https://registry.cuhk.edu.cn/sites/default/files/2024-12/Study%20Scheme%20-%20GBS_2022-23%20and%202023-24_Circular%28AB2024_C049%29.pdf",
+    "path": "data/study_schemes/2023/国际商务_适用于2022至23年度及2023至24年度入学学生.pdf",
+    "error": null
+  },
+  {
+    "major": "市场营销",
+    "page_url": "https://registry.cuhk.edu.cn/page/67",
+    "status": "downloaded",
+    "title": "市场营销_适用于2021至22、2022至23及2023至24年度入学学生.pdf",
+    "pdf_url": "https://registry.cuhk.edu.cn/sites/default/files/2024-07/Study%20Scheme%20-%20MKTG_2021-22%2C%202022-23%20and%202023-24.pdf",
+    "path": "data/study_schemes/2023/市场营销_适用于2021至22、2022至23及2023至24年度入学学生.pdf",
+    "error": null
+  },
+  {
+    "major": "会计学",
+    "page_url": "https://registry.cuhk.edu.cn/page/63",
+    "status": "downloaded",
+    "title": "会计学_适用于2023至24年度入学学生.pdf",
+    "pdf_url": "https://registry.cuhk.edu.cn/sites/default/files/2026-06/study_scheme_-_acct_2023-2024_2nd2024_20240408.pdf",
+    "path": "data/study_schemes/2023/会计学_适用于2023至24年度入学学生.pdf",
+    "error": null
+  },
+  {
+    "major": "化学",
+    "page_url": "https://registry.cuhk.edu.cn/page/235",
+    "status": "downloaded",
+    "title": "化学_适用于2022至23及2023至24年度入学学生.pdf",
+    "pdf_url": "https://registry.cuhk.edu.cn/sites/default/files/2025-04/Study%20Scheme%20-%20Chemistry_2022-23%20and%202023-24_Circular%20%28AB2025_C015%29.pdf",
+    "path": "data/study_schemes/2023/化学_适用于2022至23及2023至24年度入学学生.pdf",
+    "error": null
+  },
+  {
+    "major": "电子与计算机工程",
+    "page_url": "https://registry.cuhk.edu.cn/page/275",
+    "status": "downloaded",
+    "title": "电子与计算机工程_适用于2022至23及2023至24年度入学学生.pdf",
+    "pdf_url": "https://registry.cuhk.edu.cn/sites/default/files/2026-08/study_scheme_-_ece_2022-23_and_2023-24_3rd2026_20260720.pdf",
+    "path": "data/study_schemes/2023/电子与计算机工程_适用于2022至23及2023至24年度入学学生.pdf",
+    "error": null
+  },
+  {
+    "major": "电子信息工程",
+    "page_url": "https://registry.cuhk.edu.cn/page/61",
+    "status": "not_found",
+    "title": null,
+    "pdf_url": null,
+    "path": null,
+    "error": null
+  },
+  {
+    "major": "材料科学与工程",
+    "page_url": "https://registry.cuhk.edu.cn/page/289",
+    "status": "not_found",
+    "title": null,
+    "pdf_url": null,
+    "path": null,
+    "error": null
+  },
+  {
+    "major": "数学与应用数学",
+    "page_url": "https://registry.cuhk.edu.cn/page/59",
+    "status": "downloaded",
+    "title": "数学与应用数学_适用于2023至24年度入学学生.pdf",
+    "pdf_url": "https://registry.cuhk.edu.cn/sites/default/files/2026-08/study_scheme_-_math_2023-24_3rd2026_20260720.pdf",
+    "path": "data/study_schemes/2023/数学与应用数学_适用于2023至24年度入学学生.pdf",
+    "error": null
+  },
+  {
+    "major": "新能源科学与工程",
+    "page_url": "https://registry.cuhk.edu.cn/page/60",
+    "status": "downloaded",
+    "title": "新能源科学与工程_适用于2022至23及2023至24年度入学学生.pdf",
+    "pdf_url": "https://registry.cuhk.edu.cn/sites/default/files/2025-09/Study%20Scheme%20-%20ENER_2022-23%20and%202023-24_Circular%28AB2025_C047%29.pdf",
+    "path": "data/study_schemes/2023/新能源科学与工程_适用于2022至23及2023至24年度入学学生.pdf",
+    "error": null
+  },
+  {
+    "major": "物理学",
+    "page_url": "https://registry.cuhk.edu.cn/page/270",
+    "status": "downloaded",
+    "title": "物理学_适用于2023至24年度入学学生.pdf",
+    "pdf_url": "https://registry.cuhk.edu.cn/sites/default/files/2026-08/study_scheme_-_phy_2023-24_3rd2026_20260720_0.pdf",
+    "path": "data/study_schemes/2023/物理学_适用于2023至24年度入学学生.pdf",
+    "error": null
+  },
+  {
+    "major": "应用心理学",
+    "page_url": "https://registry.cuhk.edu.cn/page/51",
+    "status": "not_found",
+    "title": null,
+    "pdf_url": null,
+    "path": null,
+    "error": null
+  },
+  {
+    "major": "英语",
+    "page_url": "https://registry.cuhk.edu.cn/page/23",
+    "status": "not_found",
+    "title": null,
+    "pdf_url": null,
+    "path": null,
+    "error": null
+  },
+  {
+    "major": "国际组织与全球治理",
+    "page_url": "https://registry.cuhk.edu.cn/page/348",
+    "status": "not_found",
+    "title": null,
+    "pdf_url": null,
+    "path": null,
+    "error": null
+  },
+  {
+    "major": "翻译",
+    "page_url": "https://registry.cuhk.edu.cn/page/52",
+    "status": "not_found",
+    "title": null,
+    "pdf_url": null,
+    "path": null,
+    "error": null
+  },
+  {
+    "major": "城市管理",
+    "page_url": "https://registry.cuhk.edu.cn/page/344",
+    "status": "not_found",
+    "title": null,
+    "pdf_url": null,
+    "path": null,
+    "error": null
+  },
+  {
+    "major": "计算机科学与技术",
+    "page_url": "https://registry.cuhk.edu.cn/page/57",
+    "status": "downloaded",
+    "title": "计算机科学与技术_适用于2023至24年度入学学生.pdf",
+    "pdf_url": "https://registry.cuhk.edu.cn/sites/default/files/2026-08/study_scheme_-_cse_2023-24_3rd2026_20260720.pdf",
+    "path": "data/study_schemes/2023/计算机科学与技术_适用于2023至24年度入学学生.pdf",
+    "error": null
+  },
+  {
+    "major": "数据科学与大数据技术",
+    "page_url": "https://registry.cuhk.edu.cn/page/56",
+    "status": "downloaded",
+    "title": "数据科学与大数据技术_适用于2023至24年度入学学生.pdf",
+    "pdf_url": "https://registry.cuhk.edu.cn/sites/default/files/2026-08/study_scheme_-_dsbdt_2023-24_3rd2026_20260720.pdf",
+    "path": "data/study_schemes/2023/数据科学与大数据技术_适用于2023至24年度入学学生.pdf",
+    "error": null
+  },
+  {
+    "major": "统计学",
+    "page_url": "https://registry.cuhk.edu.cn/page/58",
+    "status": "downloaded",
+    "title": "统计学_适用于2022至23年度及2023至24年度入学学生.pdf",
+    "pdf_url": "https://registry.cuhk.edu.cn/sites/default/files/2026-08/study_scheme_-_stat_2022-23_and_2023-24_3rd2026_20260720.pdf",
+    "path": "data/study_schemes/2023/统计学_适用于2022至23年度及2023至24年度入学学生.pdf",
+    "error": null
+  },
+  {
+    "major": "生物信息学",
+    "page_url": "https://registry.cuhk.edu.cn/page/55",
+    "status": "downloaded",
+    "title": "生物信息学_适用于2021至22年度及以后入学学生.pdf",
+    "pdf_url": "https://registry.cuhk.edu.cn/sites/default/files/2024-09/Study%20Scheme%20-%20BIM_2021-22%20and%20thereafter_Circular%20%28AB2024_C036%29.pdf",
+    "path": "data/study_schemes/2023/生物信息学_适用于2021至22年度及以后入学学生.pdf",
+    "error": null
+  },
+  {
+    "major": "生物科学",
+    "page_url": "https://registry.cuhk.edu.cn/page/233",
+    "status": "downloaded",
+    "title": "生物科学_适用于2023至24年度及以后入学学生.pdf",
+    "pdf_url": "https://registry.cuhk.edu.cn/sites/default/files/2026-02/Study%20Scheme%20-%20BIO_2023-24%20and%20thereafter_1st%282026%29_260121_2.pdf",
+    "path": "data/study_schemes/2023/生物科学_适用于2023至24年度及以后入学学生.pdf",
+    "error": null
+  },
+  {
+    "major": "生物医学工程",
+    "page_url": "https://registry.cuhk.edu.cn/page/53",
+    "status": "downloaded",
+    "title": "生物医学工程_适用于2023至24年度及以后入学学生.pdf",
+    "pdf_url": "https://registry.cuhk.edu.cn/sites/default/files/2026-02/Study%20Scheme%20-%20BME_2023-24%20and%20thereafter_1st%282026%29_260121.pdf",
+    "path": "data/study_schemes/2023/生物医学工程_适用于2023至24年度及以后入学学生.pdf",
+    "error": null
+  },
+  {
+    "major": "临床医学",
+    "page_url": "https://registry.cuhk.edu.cn/page/263",
+    "status": "downloaded",
+    "title": "临床医学_适用于2023至24年度及以后入学学生.pdf",
+    "pdf_url": "https://registry.cuhk.edu.cn/sites/default/files/2026-06/study_scheme_clinical_medicine_2023-24_and_thereafter_1st2025_250120.pdf",
+    "path": "data/study_schemes/2023/临床医学_适用于2023至24年度及以后入学学生.pdf",
+    "error": null
+  },
+  {
+    "major": "药学",
+    "page_url": "https://registry.cuhk.edu.cn/page/234",
+    "status": "downloaded",
+    "title": "药学_适用于2023至24年度及以后入学学生.pdf",
+    "pdf_url": "https://registry.cuhk.edu.cn/sites/default/files/2025-09/Study%20Scheme%20-%20PHM_2023-24%20and%20thereafter_Circular%28AB2025_C047%29.pdf",
+    "path": "data/study_schemes/2023/药学_适用于2023至24年度及以后入学学生.pdf",
+    "error": null
+  },
+  {
+    "major": "作曲与作曲技术理论",
+    "page_url": "https://registry.cuhk.edu.cn/page/273",
+    "status": "downloaded",
+    "title": "作曲与作曲技术理论_适用于2022至23年度及2023至24年度入学学生.pdf",
+    "pdf_url": "https://registry.cuhk.edu.cn/sites/default/files/2026-08/study_scheme_-_music_composition_and_theory_2022-23_and_2023-24_3rd2026_20260720.pdf",
+    "path": "data/study_schemes/2023/作曲与作曲技术理论_适用于2022至23年度及2023至24年度入学学生.pdf",
+    "error": null
+  },
+  {
+    "major": "音乐学",
+    "page_url": "https://registry.cuhk.edu.cn/page/274",
+    "status": "downloaded",
+    "title": "音乐学_适用于2022至23及2023至24年度入学学生.pdf",
+    "pdf_url": "https://registry.cuhk.edu.cn/sites/default/files/2026-08/study_scheme_-_musicology_2022-23_and_2023-24_3rd2026_20260720.pdf",
+    "path": "data/study_schemes/2023/音乐学_适用于2022至23及2023至24年度入学学生.pdf",
+    "error": null
+  },
+  {
+    "major": "音乐表演",
+    "page_url": "https://registry.cuhk.edu.cn/page/237",
+    "status": "downloaded",
+    "title": "音乐表演_适用于2023至24年度入学学生.pdf",
+    "pdf_url": "https://registry.cuhk.edu.cn/sites/default/files/2026-08/study_scheme_-_music_performance_2023-24_3rd2026_20260720.pdf",
+    "path": "data/study_schemes/2023/音乐表演_适用于2023至24年度入学学生.pdf",
+    "error": null
+  },
+  {
+    "major": "人工智能",
+    "page_url": "https://registry.cuhk.edu.cn/page/364",
+    "status": "not_found",
+    "title": null,
+    "pdf_url": null,
+    "path": null,
+    "error": null
+  },
+  {
+    "major": "金融工程",
+    "page_url": "https://registry.cuhk.edu.cn/page/62",
+    "status": "downloaded",
+    "title": "金融工程_适用于2021至22、2022至23、2023至24及2024至25年度入学学生.pdf",
+    "pdf_url": "https://registry.cuhk.edu.cn/sites/default/files/2026-06/study_scheme_-_fe_2021-22_2022-23_2023-24_and_2024-25_circular_ab2026_c014.pdf",
+    "path": "data/study_schemes/2023/金融工程_适用于2021至22、2022至23、2023至24及2024至25年度入学学生.pdf",
+    "error": null
+  }
+]

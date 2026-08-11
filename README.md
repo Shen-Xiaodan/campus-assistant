@@ -107,6 +107,17 @@ python -m app.ingest
 python -m app.ingest --source /path/to/campus-pdfs
 ```
 
+也可以从香港中文大学（深圳）教务处本科生手册批量下载适用于 2023 年入学学生的主修修读计划：
+
+```bash
+python -m app.crawl_study_schemes --year 2023
+python -m app.ingest
+```
+
+下载结果默认保存至 `data/study_schemes/2023/`，并生成 `manifest.json`。程序会识别“2023至24年度”及
+“2023至24年度及以后”等覆盖关系；没有适用版本的专业只记录在清单中。运行
+`python -m app.crawl_study_schemes --year 2023 --dry-run` 可只检查选择结果而不下载 PDF。
+
 命令会报告新增/更新、未变化跳过、失败文档、文本块数和页面提示。文件发生变化后再次运行即可增量更新。索引位于 `INDEX_DIR`，问答应用本身不会重新解析所有 PDF。
 
 ### 3. 启动 API 和界面
