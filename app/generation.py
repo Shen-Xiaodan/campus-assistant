@@ -75,6 +75,15 @@ def _content(result: Any) -> str:
     return str(content).strip()
 
 
+def cited_evidence(answer: str, evidence: list[RetrievedEvidence]) -> list[RetrievedEvidence]:
+    """Keep only evidence whose exact citation label occurs in the answer."""
+    return [
+        item
+        for item in evidence
+        if citation_label(item.document, item.page, item.metadata.get("section")) in answer
+    ]
+
+
 class AnswerGenerator:
     def __init__(self, settings: Settings, model: TextGenerator | None = None):
         self.settings = settings
@@ -115,6 +124,9 @@ class AnswerGenerator:
         text = _content(self._get_model().invoke(build_prompt(question, evidence)))
         if not text or text == REFUSAL_ANSWER:
             return ChatResponse(answer=REFUSAL_ANSWER, sources=[], grounded=False)
+        referenced = cited_evidence(text, evidence)
+        if not referenced:
+            return ChatResponse(answer=REFUSAL_ANSWER, sources=[], grounded=False)
         sources = [
             SourceResponse(
                 document=item.document,
@@ -126,6 +138,6 @@ class AnswerGenerator:
                 section=item.metadata.get("section"),
                 crawled_at=item.metadata.get("crawled_at"),
             )
-            for item in evidence
+            for item in referenced
         ]
         return ChatResponse(answer=text, sources=sources, grounded=True)

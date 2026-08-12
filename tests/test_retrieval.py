@@ -10,6 +10,7 @@ from app.retrieval import (
     expand_query,
     is_aggregate_query,
     keyword_score,
+    matching_study_scheme_documents,
     normalize_search_text,
 )
 
@@ -57,6 +58,21 @@ def test_aggregate_query_detection_is_high_precision():
     assert is_aggregate_query("List all available programmes")
     assert not is_aggregate_query("申请奖学金需要满足哪些条件？")
     assert not is_aggregate_query("Visual Analytics 的课程代码是什么？")
+
+
+def test_explicit_programme_query_matches_only_its_study_scheme():
+    metadatas = [
+        {"document": "金融学_适用于2023至24年度入学学生.pdf"},
+        {"document": "金融工程_适用于2023至24年度入学学生.pdf"},
+        {"document": "数据科学与大数据技术_适用于2023至24年度入学学生.pdf"},
+    ]
+    assert matching_study_scheme_documents("金融学的必修课", metadatas) == {
+        "金融学_适用于2023至24年度入学学生.pdf"
+    }
+    assert matching_study_scheme_documents("金融工程有哪些必修课", metadatas) == {
+        "金融工程_适用于2023至24年度入学学生.pdf"
+    }
+    assert matching_study_scheme_documents("港中深有哪些专业", metadatas) == set()
 
 
 def test_diversify_evidence_prefers_document_coverage_before_second_chunks():
@@ -147,3 +163,50 @@ def test_aggregate_query_uses_wider_fetch_and_document_diversity():
     )
     results = CampusRetriever(AggregateVectorstore(), settings).retrieve("港中深有哪些专业？")
     assert [item.document for item in results] == ["培养方案.pdf", "专业乙.pdf", "专业丙.pdf"]
+
+
+class ProgrammeVectorstore:
+    def similarity_search_with_score(self, query: str, k: int):
+        return [
+            (
+                type(
+                    "Document",
+                    (),
+                    {
+                        "page_content": "金融学必修科目 FIN2020",
+                        "metadata": {"document": "金融学_适用于2023至24年度入学学生.pdf", "page": 2},
+                    },
+                )(),
+                0.1,
+            ),
+            (
+                type(
+                    "Document",
+                    (),
+                    {
+                        "page_content": "数据科学必修科目 DDA4002",
+                        "metadata": {
+                            "document": "数据科学与大数据技术_适用于2023至24年度入学学生.pdf",
+                            "page": 1,
+                        },
+                    },
+                )(),
+                0.11,
+            ),
+        ]
+
+    def get(self, include):
+        return {
+            "documents": ["金融学必修科目 FIN2020", "数据科学必修科目 DDA4002"],
+            "metadatas": [
+                {"document": "金融学_适用于2023至24年度入学学生.pdf", "page": 2},
+                {"document": "数据科学与大数据技术_适用于2023至24年度入学学生.pdf", "page": 1},
+            ],
+        }
+
+
+def test_explicit_programme_query_filters_other_programme_documents():
+    settings = Settings(top_k=4, fetch_k=4, similarity_threshold=0.4, hybrid_search=False)
+    results = CampusRetriever(ProgrammeVectorstore(), settings).retrieve("金融学的必修课")
+    assert len(results) == 1
+    assert results[0].document.startswith("金融学_")

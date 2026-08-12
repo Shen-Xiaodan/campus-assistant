@@ -1,5 +1,5 @@
 from app.config import Settings
-from app.generation import REFUSAL_ANSWER, AnswerGenerator, OpenAICompatibleChatModel, citation_label
+from app.generation import REFUSAL_ANSWER, AnswerGenerator, OpenAICompatibleChatModel, citation_label, cited_evidence
 from app.models import RetrievedEvidence
 
 
@@ -28,6 +28,25 @@ def test_grounded_answer_returns_bounded_sources():
     assert result.sources[0].document == "学生手册.pdf"
     assert result.sources[0].page == 12
     assert len(result.sources[0].excerpt) <= 30
+
+
+def test_only_evidence_actually_cited_by_answer_is_returned():
+    cited = RetrievedEvidence("金融学必修课", "金融学.pdf", 2, 0.9)
+    unused = RetrievedEvidence("数据科学必修课", "数据科学.pdf", 1, 0.85)
+    answer = "金融学必修课包括 FIN2020。【金融学.pdf，第 2 页】"
+    assert cited_evidence(answer, [cited, unused]) == [cited]
+
+
+def test_answer_without_valid_citation_is_rejected():
+    class UncitedModel:
+        def invoke(self, prompt: str) -> str:
+            return "金融学必修课包括 FIN2020。"
+
+    item = RetrievedEvidence("金融学必修课包括 FIN2020", "金融学.pdf", 2, 0.9)
+    result = AnswerGenerator(Settings(), model=UncitedModel()).answer("金融学的必修课", [item])
+    assert result.answer == REFUSAL_ANSWER
+    assert result.sources == []
+    assert result.grounded is False
 
 
 def test_web_evidence_returns_url_and_section():

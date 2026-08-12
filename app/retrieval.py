@@ -75,6 +75,27 @@ def is_aggregate_query(query: str) -> bool:
     return any(pattern.search(normalized) for pattern in AGGREGATE_QUERY_PATTERNS)
 
 
+def matching_study_scheme_documents(query: str, metadatas: Iterable[dict[str, Any] | None]) -> set[str]:
+    """Find explicitly named programme documents, preferring the longest name."""
+    normalized_query = normalize_search_text(query)
+    matches: dict[str, str] = {}
+    for metadata in metadatas:
+        document = str((metadata or {}).get("document", ""))
+        if not document.lower().endswith(".pdf") or "_适用于" not in document:
+            continue
+        programme = document.split("_适用于", 1)[0].strip()
+        if programme and normalize_search_text(programme) in normalized_query:
+            matches[document] = programme
+    if not matches:
+        return set()
+    longest = max(len(normalize_search_text(programme)) for programme in matches.values())
+    return {
+        document
+        for document, programme in matches.items()
+        if len(normalize_search_text(programme)) == longest
+    }
+
+
 def _tokens(text: str) -> list[str]:
     lowered = normalize_search_text(text)
     latin = re.findall(r"[a-z0-9]{2,}", lowered)
@@ -168,6 +189,8 @@ class CampusRetriever:
         fetch_k = self.settings.aggregate_fetch_k if aggregate_query else self.settings.fetch_k
         top_k = self.settings.aggregate_top_k if aggregate_query else self.settings.top_k
         query_variants = expand_query(query)
+        raw = self.vectorstore.get(include=["documents", "metadatas"])
+        target_documents = matching_study_scheme_documents(query, raw.get("metadatas", []))
         vector_results: dict[tuple[str, int, str], tuple[Any, float]] = {}
         for variant in query_variants:
             for document, distance in self.vectorstore.similarity_search_with_score(variant, k=fetch_k):
@@ -196,7 +219,6 @@ class CampusRetriever:
             seen_texts.add(document.page_content)
 
         if self.settings.hybrid_search:
-            raw = self.vectorstore.get(include=["documents", "metadatas"])
             keyword_candidates: list[RetrievedEvidence] = []
             for text, metadata in zip(raw.get("documents", []), raw.get("metadatas", []), strict=False):
                 score = max(keyword_score(variant, text) for variant in query_variants)
@@ -208,6 +230,8 @@ class CampusRetriever:
             )
 
         eligible = [item for item in merged if item.score >= self.settings.similarity_threshold]
+        if target_documents:
+            eligible = [item for item in eligible if item.document in target_documents]
         if aggregate_query:
             return diversify_evidence(
                 eligible,
