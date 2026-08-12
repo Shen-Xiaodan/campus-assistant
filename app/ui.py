@@ -87,36 +87,12 @@ st.markdown(
         }
 
         .section-label {
-            border-top: 1px solid var(--line);
             color: var(--muted);
             font-size: .7rem;
             font-weight: 600;
             letter-spacing: .14em;
-            margin: .5rem 0 1rem;
-            padding-top: 1.25rem;
+            margin: 1.35rem 0 .75rem;
             text-transform: uppercase;
-        }
-
-        [data-testid="stSidebar"] .stButton > button {
-            background: transparent;
-            border: 0;
-            border-bottom: 1px solid var(--line);
-            border-radius: 0;
-            color: #3f443e;
-            font-size: .86rem;
-            justify-content: flex-start;
-            line-height: 1.55;
-            min-height: 3.25rem;
-            padding: .7rem .2rem;
-            text-align: left;
-            transition: color .18s ease, padding-left .18s ease;
-        }
-
-        [data-testid="stSidebar"] .stButton > button:hover {
-            background: transparent;
-            border-color: var(--sage);
-            color: var(--sage);
-            padding-left: .45rem;
         }
 
         .hero { margin-bottom: 3rem; }
@@ -146,15 +122,23 @@ st.markdown(
             max-width: 590px;
         }
 
-        .empty-state {
-            border-bottom: 1px solid var(--line);
-            border-top: 1px solid var(--line);
-            color: var(--muted);
-            font-family: "Songti SC", serif;
-            font-size: 1.05rem;
-            line-height: 1.8;
-            margin: 1rem 0 2rem;
-            padding: 1.35rem 0;
+        [data-testid="stHorizontalBlock"] .stButton > button {
+            background: var(--white);
+            border: 1px solid var(--line);
+            border-radius: 3px;
+            color: #454a43;
+            font-size: .82rem;
+            line-height: 1.5;
+            min-height: 3.6rem;
+            padding: .65rem .8rem;
+            transition: border-color .18s ease, color .18s ease, transform .18s ease;
+        }
+
+        [data-testid="stHorizontalBlock"] .stButton > button:hover {
+            background: var(--white);
+            border-color: var(--sage);
+            color: var(--sage);
+            transform: translateY(-1px);
         }
 
         [data-testid="stChatMessage"] {
@@ -249,15 +233,9 @@ with st.sidebar:
         <div class="brand-kicker">Campus Guide · 2026</div>
         <p class="brand-title">校园知识<br>问答助手</p>
         <p class="brand-copy">从校园规章、学生手册与办事指南中查找答案，并为每条结论标注资料出处。</p>
-        <div class="section-label">从一个问题开始</div>
         """,
         unsafe_allow_html=True,
     )
-
-    selected_example = None
-    for index, example in enumerate(EXAMPLES, start=1):
-        if st.button(f"{index:02d}  {example}", key=f"example_{index}", use_container_width=True):
-            selected_example = example
 
 st.markdown(
     """
@@ -272,10 +250,30 @@ st.markdown(
 )
 
 if not st.session_state.messages:
-    st.markdown(
-        '<div class="empty-state">从左侧选择一个示例，或在下方写下你想了解的校园事务。</div>',
-        unsafe_allow_html=True,
-    )
+    with st.chat_message("assistant"):
+        st.markdown(
+            """
+### 你好，我是港中深校园助手 👋
+
+你可以问我关于港中深的：
+
+- **专业与课程**：专业设置、培养方案和课程信息
+- **校园事务**：学生证、奖学金、社会实践等办事流程
+- **校园服务**：图书馆开放时间、部门联系方式和服务指南
+
+我会从已收录的学校资料和官网内容中查找答案，并附上**资料来源、页码或原文链接**，方便你进一步核对。
+            """
+        )
+
+    st.markdown('<div class="section-label">你可以从这些问题开始</div>', unsafe_allow_html=True)
+    selected_example = None
+    example_columns = st.columns(len(EXAMPLES))
+    for index, (column, example) in enumerate(zip(example_columns, EXAMPLES, strict=True), start=1):
+        with column:
+            if st.button(example, key=f"example_{index}", use_container_width=True):
+                selected_example = example
+else:
+    selected_example = None
 
 for message in st.session_state.messages:
     with st.chat_message(message["role"]):
