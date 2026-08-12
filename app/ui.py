@@ -349,7 +349,7 @@ for message in st.session_state.messages:
     with st.chat_message(message["role"]):
         st.markdown(message["content"])
         if message.get("grounded") is False:
-            st.warning("证据不足：当前资料不能支持确定答案。")
+            st.info("现有资料暂时不足，你可以补充更具体的信息，我再帮你找找。")
         for source in message.get("sources", []):
             location = f"第 {source['page']} 页" if source.get("page") else source.get("section") or "学校官网"
             with st.expander(f"资料来源 · {source['document']} · {location} · 相关度 {source['score']:.2f}"):
@@ -377,13 +377,21 @@ typed_question = st.chat_input("询问校园规章、办事流程或学生服务
 question = selected_example if selected_example is not None else typed_question
 
 if question:
+    request_history = [
+        {"role": message["role"], "content": message["content"]}
+        for message in st.session_state.messages[-6:]
+    ]
     st.session_state.messages.append({"role": "user", "content": question})
     with st.chat_message("user"):
         st.markdown(question)
     with st.chat_message("assistant"):
         try:
             with st.spinner("正在查阅校园资料……"):
-                api_response = requests.post(f"{API_URL}/chat", json={"question": question}, timeout=90)
+                api_response = requests.post(
+                    f"{API_URL}/chat",
+                    json={"question": question, "history": request_history},
+                    timeout=90,
+                )
                 if api_response.status_code == 503:
                     detail = api_response.json().get("detail", "知识库尚未就绪")
                     raise RuntimeError(f"问答服务已连接，但暂不可用：{detail}")
@@ -391,7 +399,7 @@ if question:
                 result = api_response.json()
             st.markdown(result["answer"])
             if not result["grounded"]:
-                st.warning("证据不足：当前资料不能支持确定答案。")
+                st.info("现有资料暂时不足，你可以补充更具体的信息，我再帮你找找。")
             for source in result["sources"]:
                 location = f"第 {source['page']} 页" if source.get("page") else source.get("section") or "学校官网"
                 with st.expander(f"资料来源 · {source['document']} · {location} · 相关度 {source['score']:.2f}"):

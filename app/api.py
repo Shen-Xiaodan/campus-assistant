@@ -80,7 +80,7 @@ def create_app(settings: Settings | None = None, service: Any | None = None) -> 
             raise HTTPException(status_code=503, detail=detail)
         started = time.perf_counter()
         try:
-            response = qa_service.ask(payload.question)
+            response = qa_service.ask(payload.question, payload.history)
         except CampusAssistantError:
             raise
         except Exception as exc:

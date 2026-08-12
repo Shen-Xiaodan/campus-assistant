@@ -23,8 +23,14 @@ class RetrievedEvidence:
     metadata: dict[str, Any] = field(default_factory=dict)
 
 
+class ChatHistoryMessage(BaseModel):
+    role: str = Field(pattern="^(user|assistant)$")
+    content: str = Field(min_length=1, max_length=4000)
+
+
 class ChatRequest(BaseModel):
     question: str = Field(min_length=1, max_length=2000)
+    history: list[ChatHistoryMessage] = Field(default_factory=list, max_length=10)
 
 
 class SourceResponse(BaseModel):

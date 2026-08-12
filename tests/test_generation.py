@@ -1,6 +1,6 @@
 from app.config import Settings
 from app.generation import REFUSAL_ANSWER, AnswerGenerator, OpenAICompatibleChatModel, citation_label, cited_evidence
-from app.models import RetrievedEvidence
+from app.models import ChatHistoryMessage, RetrievedEvidence
 
 
 class FakeModel:
@@ -12,6 +12,22 @@ class FakeModel:
 def test_citation_format():
     assert citation_label("学生手册.pdf", 12) == "【学生手册.pdf，第 12 页】"
     assert citation_label("图书馆官网", None, "开放时间") == "【图书馆官网，开放时间】"
+
+
+def test_prompt_is_friendly_and_includes_recent_conversation():
+    from app.generation import build_prompt
+
+    history = [
+        ChatHistoryMessage(role="user", content="金融学有哪些必修课？"),
+        ChatHistoryMessage(role="assistant", content="我帮你整理了一部分。"),
+    ]
+    item = RetrievedEvidence("必修科目 FIN2020", "金融学.pdf", 2, 0.9)
+    prompt = build_prompt("还有呢？", [item], history)
+
+    assert "耐心、亲切、靠谱" in prompt
+    assert "同学：金融学有哪些必修课？" in prompt
+    assert "助手：我帮你整理了一部分。" in prompt
+    assert "问题：还有呢？" in prompt
 
 
 def test_low_relevance_empty_evidence_refuses_without_model_call():
