@@ -59,7 +59,79 @@ st.markdown(
         }
 
         [data-testid="stSidebar"] .block-container {
-            padding: 2.4rem 1.35rem;
+            padding: 3rem 1.6rem 2rem;
+        }
+
+        .sidebar-brand {
+            min-height: calc(100vh - 7rem);
+            display: flex;
+            flex-direction: column;
+        }
+
+        .sidebar-eyebrow {
+            color: var(--sage);
+            font-size: .61rem;
+            font-weight: 600;
+            letter-spacing: .2em;
+            margin-bottom: 1.8rem;
+            text-transform: uppercase;
+        }
+
+        .sidebar-mark {
+            align-items: center;
+            background: var(--ink);
+            border-radius: 50%;
+            color: var(--paper);
+            display: flex;
+            font-family: "Playfair Display", serif;
+            font-size: 1.1rem;
+            height: 2.7rem;
+            justify-content: center;
+            margin-bottom: 1.4rem;
+            width: 2.7rem;
+        }
+
+        .sidebar-name {
+            color: var(--ink);
+            font-family: "Songti SC", "Noto Sans SC", serif;
+            font-size: 2.35rem;
+            font-weight: 600;
+            letter-spacing: -.06em;
+            line-height: 1.08;
+            margin: 0;
+        }
+
+        .sidebar-name span {
+            color: var(--sage);
+            display: block;
+            font-size: .72rem;
+            font-weight: 500;
+            letter-spacing: .18em;
+            margin-bottom: .65rem;
+        }
+
+        .sidebar-rule {
+            background: var(--line);
+            height: 1px;
+            margin: 2rem 0 1.7rem;
+            width: 100%;
+        }
+
+        .sidebar-copy {
+            color: var(--muted);
+            font-size: .72rem;
+            line-height: 1.9;
+            margin: 0;
+        }
+
+        .sidebar-meta {
+            border-top: 1px solid var(--line);
+            color: #8c9088;
+            font-size: .58rem;
+            letter-spacing: .14em;
+            margin-top: auto;
+            padding-top: 1.2rem;
+            text-transform: uppercase;
         }
 
         .brand-kicker {
@@ -230,9 +302,17 @@ if "messages" not in st.session_state:
 with st.sidebar:
     st.markdown(
         """
-        <div class="brand-kicker">Campus Guide · 2026</div>
-        <p class="brand-title">校园知识<br>问答助手</p>
-        <p class="brand-copy">从校园规章、学生手册与办事指南中查找答案，并为每条结论标注资料出处。</p>
+        <section class="sidebar-brand">
+            <div class="sidebar-eyebrow">CUHK · Shenzhen</div>
+            <div class="sidebar-mark">中</div>
+            <p class="sidebar-name"><span>港中深</span>校园助手</p>
+            <div class="sidebar-rule"></div>
+            <p class="sidebar-copy">
+                查阅校园规章、学生手册与学校官网，<br>
+                为你的问题提供清晰、可追溯的回答。
+            </p>
+            <div class="sidebar-meta">Campus Knowledge Desk · 2026</div>
+        </section>
         """,
         unsafe_allow_html=True,
     )
@@ -265,16 +345,6 @@ if not st.session_state.messages:
             """
         )
 
-    st.markdown('<div class="section-label">你可以从这些问题开始</div>', unsafe_allow_html=True)
-    selected_example = None
-    example_columns = st.columns(len(EXAMPLES))
-    for index, (column, example) in enumerate(zip(example_columns, EXAMPLES, strict=True), start=1):
-        with column:
-            if st.button(example, key=f"example_{index}", use_container_width=True):
-                selected_example = example
-else:
-    selected_example = None
-
 for message in st.session_state.messages:
     with st.chat_message(message["role"]):
         st.markdown(message["content"])
@@ -288,6 +358,17 @@ for message in st.session_state.messages:
                     st.link_button("查看学校官网原文", source["url"])
                 if source.get("crawled_at"):
                     st.caption(f"最后采集：{source['crawled_at'][:10]}")
+
+st.markdown(
+    f'<div class="section-label">{"你可以从这些问题开始" if not st.session_state.messages else "继续探索"}</div>',
+    unsafe_allow_html=True,
+)
+selected_example = None
+example_columns = st.columns(len(EXAMPLES))
+for index, (column, example) in enumerate(zip(example_columns, EXAMPLES, strict=True), start=1):
+    with column:
+        if st.button(example, key=f"example_{index}", use_container_width=True):
+            selected_example = example
 
 # Always render the input. Using ``selected_example or st.chat_input(...)`` here
 # makes Python skip the widget whenever an example is clicked, which is why the
@@ -328,3 +409,8 @@ if question:
             error = "无法连接问答服务，请确认 API 已启动且索引已建立。"
             st.error(error)
             st.session_state.messages.append({"role": "assistant", "content": error, "grounded": False, "sources": []})
+
+    # Persist the completed turn before accepting another quick question. This
+    # rerun redraws the full history from session state and prevents a second
+    # example click from replacing the answer that was rendered provisionally.
+    st.rerun()
