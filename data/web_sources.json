@@ -1,0 +1,43 @@
+{
+  "sources": [
+    {
+      "name": "香港中文大学（深圳）官网",
+      "department": "大学公共信息",
+      "start_urls": [
+        "https://www.cuhk.edu.cn/zh-hans/students",
+        "https://www.cuhk.edu.cn/zh-hans/node/77"
+      ],
+      "allowed_domains": ["cuhk.edu.cn"],
+      "allowed_paths": ["/zh-hans/students", "/zh-hans/node/77"],
+      "max_pages": 2,
+      "max_depth": 0,
+      "delay": 0.5
+    },
+    {
+      "name": "行政服务部门",
+      "department": "行政服务",
+      "start_urls": [
+        "https://www.cuhk.edu.cn/zh-hans/page/106",
+        "https://www.cuhk.edu.cn/zh-hans/page/107"
+      ],
+      "allowed_domains": ["cuhk.edu.cn"],
+      "allowed_paths": ["/zh-hans/page/106", "/zh-hans/page/107"],
+      "max_pages": 2,
+      "max_depth": 0,
+      "delay": 0.5
+    },
+    {
+      "name": "学生事务处",
+      "department": "学生事务处",
+      "start_urls": [
+        "https://osa.cuhk.edu.cn/index.php/zh-hans/basic/373",
+        "https://osa.cuhk.edu.cn/zh-hans/basic/344"
+      ],
+      "allowed_domains": ["osa.cuhk.edu.cn"],
+      "allowed_paths": ["/index.php/zh-hans/basic/", "/zh-hans/basic/"],
+      "max_pages": 20,
+      "max_depth": 1,
+      "delay": 0.5
+    }
+  ]
+}

@@ -72,7 +72,7 @@ def create_app(settings: Settings | None = None, service: Any | None = None) -> 
         ready = getattr(request.app.state, "qa_service", None) is not None
         return {"status": "ready" if ready else "degraded"}
 
-    @app.post("/chat", response_model=ChatResponse)
+    @app.post("/chat", response_model=ChatResponse, response_model_exclude_none=True)
     async def chat(payload: ChatRequest, request: Request) -> ChatResponse:
         qa_service = getattr(request.app.state, "qa_service", None)
         if qa_service is None:

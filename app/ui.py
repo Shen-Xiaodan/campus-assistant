@@ -283,10 +283,13 @@ for message in st.session_state.messages:
         if message.get("grounded") is False:
             st.warning("证据不足：当前资料不能支持确定答案。")
         for source in message.get("sources", []):
-            with st.expander(
-                f"资料来源 · {source['document']} · 第 {source['page']} 页 · 相关度 {source['score']:.2f}"
-            ):
+            location = f"第 {source['page']} 页" if source.get("page") else source.get("section") or "学校官网"
+            with st.expander(f"资料来源 · {source['document']} · {location} · 相关度 {source['score']:.2f}"):
                 st.write(source["excerpt"])
+                if source.get("url"):
+                    st.link_button("查看学校官网原文", source["url"])
+                if source.get("crawled_at"):
+                    st.caption(f"最后采集：{source['crawled_at'][:10]}")
 
 # Always render the input. Using ``selected_example or st.chat_input(...)`` here
 # makes Python skip the widget whenever an example is clicked, which is why the
@@ -311,10 +314,13 @@ if question:
             if not result["grounded"]:
                 st.warning("证据不足：当前资料不能支持确定答案。")
             for source in result["sources"]:
-                with st.expander(
-                    f"资料来源 · {source['document']} · 第 {source['page']} 页 · 相关度 {source['score']:.2f}"
-                ):
+                location = f"第 {source['page']} 页" if source.get("page") else source.get("section") or "学校官网"
+                with st.expander(f"资料来源 · {source['document']} · {location} · 相关度 {source['score']:.2f}"):
                     st.write(source["excerpt"])
+                    if source.get("url"):
+                        st.link_button("查看学校官网原文", source["url"])
+                    if source.get("crawled_at"):
+                        st.caption(f"最后采集：{source['crawled_at'][:10]}")
             st.session_state.messages.append({"role": "assistant", "content": result["answer"], **result})
         except RuntimeError as exc:
             error = str(exc)

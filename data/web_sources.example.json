@@ -1,0 +1,14 @@
+{
+  "sources": [
+    {
+      "name": "学校官网示例栏目",
+      "department": "示例单位",
+      "start_urls": ["https://www.example.edu.cn/student-services/"],
+      "allowed_domains": ["example.edu.cn"],
+      "allowed_paths": ["/student-services/"],
+      "max_pages": 30,
+      "max_depth": 2,
+      "delay": 0.5
+    }
+  ]
+}

@@ -32,6 +32,9 @@ class Settings:
     chunk_overlap: int = 150
     top_k: int = 4
     fetch_k: int = 12
+    aggregate_top_k: int = 10
+    aggregate_fetch_k: int = 30
+    aggregate_max_chunks_per_document: int = 2
     similarity_threshold: float = 0.40
     keyword_bonus_weight: float = 0.25
     hybrid_search: bool = True
@@ -64,6 +67,14 @@ class Settings:
             chunk_overlap=int(os.getenv("CHUNK_OVERLAP", str(defaults.chunk_overlap))),
             top_k=int(os.getenv("TOP_K", str(defaults.top_k))),
             fetch_k=int(os.getenv("FETCH_K", str(defaults.fetch_k))),
+            aggregate_top_k=int(os.getenv("AGGREGATE_TOP_K", str(defaults.aggregate_top_k))),
+            aggregate_fetch_k=int(os.getenv("AGGREGATE_FETCH_K", str(defaults.aggregate_fetch_k))),
+            aggregate_max_chunks_per_document=int(
+                os.getenv(
+                    "AGGREGATE_MAX_CHUNKS_PER_DOCUMENT",
+                    str(defaults.aggregate_max_chunks_per_document),
+                )
+            ),
             similarity_threshold=float(os.getenv("SIMILARITY_THRESHOLD", str(defaults.similarity_threshold))),
             keyword_bonus_weight=float(os.getenv("KEYWORD_BONUS_WEIGHT", str(defaults.keyword_bonus_weight))),
             hybrid_search=_env_bool("HYBRID_SEARCH", defaults.hybrid_search),
@@ -76,6 +87,10 @@ class Settings:
             raise ValueError("CHUNK_SIZE 必须大于 0，且 CHUNK_OVERLAP 必须小于 CHUNK_SIZE")
         if self.top_k <= 0 or self.fetch_k < self.top_k:
             raise ValueError("TOP_K 必须大于 0，且 FETCH_K 不能小于 TOP_K")
+        if self.aggregate_top_k <= 0 or self.aggregate_fetch_k < self.aggregate_top_k:
+            raise ValueError("AGGREGATE_TOP_K 必须大于 0，且 AGGREGATE_FETCH_K 不能小于 AGGREGATE_TOP_K")
+        if self.aggregate_max_chunks_per_document <= 0:
+            raise ValueError("AGGREGATE_MAX_CHUNKS_PER_DOCUMENT 必须大于 0")
         if not 0 <= self.similarity_threshold <= 1:
             raise ValueError("SIMILARITY_THRESHOLD 必须位于 0 到 1 之间")
         if not 0 <= self.keyword_bonus_weight <= 1:

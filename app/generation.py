@@ -48,13 +48,15 @@ class OpenAICompatibleChatModel:
             raise GenerationUnavailableError(f"OpenAI-compatible 模型调用失败{suffix}") from exc
 
 
-def citation_label(document: str, page: int) -> str:
-    return f"【{document}，第 {page} 页】"
+def citation_label(document: str, page: int | None, section: str | None = None) -> str:
+    if page is not None:
+        return f"【{document}，第 {page} 页】"
+    return f"【{document}{f'，{section}' if section else ''}】"
 
 
 def build_prompt(question: str, evidence: list[RetrievedEvidence]) -> str:
     context = "\n\n".join(
-        f"证据 {index} {citation_label(item.document, item.page)}\n{item.text}"
+        f"证据 {index} {citation_label(item.document, item.page, item.metadata.get('section'))}\n{item.text}"
         for index, item in enumerate(evidence, start=1)
     )
     return f"""你是校园知识问答助手。只允许根据下方证据回答校园事实。
@@ -119,6 +121,10 @@ class AnswerGenerator:
                 page=item.page,
                 excerpt=item.text[: self.settings.max_excerpt_chars].strip(),
                 score=round(item.score, 4),
+                source_type=str(item.metadata.get("source_type", "pdf")),
+                url=item.metadata.get("source_url"),
+                section=item.metadata.get("section"),
+                crawled_at=item.metadata.get("crawled_at"),
             )
             for item in evidence
         ]

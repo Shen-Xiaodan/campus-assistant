@@ -6,7 +6,9 @@ from app.retrieval import (
     CampusRetriever,
     deduplicate_evidence,
     distance_to_relevance,
+    diversify_evidence,
     expand_query,
+    is_aggregate_query,
     keyword_score,
     normalize_search_text,
 )
@@ -49,6 +51,28 @@ def test_query_expansion_adds_chinese_english_course_aliases():
     assert "生命科学" in bio_variants
 
 
+def test_aggregate_query_detection_is_high_precision():
+    assert is_aggregate_query("港中深有哪些专业？")
+    assert is_aggregate_query("请列出学校全部课程")
+    assert is_aggregate_query("List all available programmes")
+    assert not is_aggregate_query("申请奖学金需要满足哪些条件？")
+    assert not is_aggregate_query("Visual Analytics 的课程代码是什么？")
+
+
+def test_diversify_evidence_prefers_document_coverage_before_second_chunks():
+    results = diversify_evidence(
+        [
+            RetrievedEvidence("甲-1", "甲.pdf", 1, 0.99),
+            RetrievedEvidence("甲-2", "甲.pdf", 2, 0.98),
+            RetrievedEvidence("乙-1", "乙.pdf", 1, 0.80),
+            RetrievedEvidence("丙-1", "丙.pdf", 1, 0.70),
+        ],
+        top_k=3,
+        max_chunks_per_document=2,
+    )
+    assert [item.document for item in results] == ["甲.pdf", "乙.pdf", "丙.pdf"]
+
+
 def test_cosine_distance_is_converted_to_bounded_relevance():
     assert distance_to_relevance(0.18, "cosine") == pytest.approx(0.82)
     assert distance_to_relevance(1.5, "cosine") == 0.0
@@ -80,3 +104,46 @@ def test_retriever_uses_raw_cosine_distance_before_thresholding():
     assert len(results) == 1
     assert results[0].page == 3
     assert results[0].score == 0.88
+
+
+class AggregateVectorstore:
+    def similarity_search_with_score(self, query: str, k: int):
+        assert query == "港中深有哪些专业？"
+        assert k == 8
+        return [
+            (FakeDocument("专业甲的培养方案", 1), 0.05),
+            (FakeDocument("专业甲的课程设置", 2), 0.06),
+            (
+                type(
+                    "Document",
+                    (),
+                    {"page_content": "专业乙的培养方案", "metadata": {"document": "专业乙.pdf", "page": 1}},
+                )(),
+                0.20,
+            ),
+            (
+                type(
+                    "Document",
+                    (),
+                    {"page_content": "专业丙的培养方案", "metadata": {"document": "专业丙.pdf", "page": 1}},
+                )(),
+                0.25,
+            ),
+        ]
+
+    def get(self, include):
+        return {"documents": [], "metadatas": []}
+
+
+def test_aggregate_query_uses_wider_fetch_and_document_diversity():
+    settings = Settings(
+        top_k=2,
+        fetch_k=4,
+        aggregate_top_k=3,
+        aggregate_fetch_k=8,
+        aggregate_max_chunks_per_document=1,
+        similarity_threshold=0.4,
+        hybrid_search=False,
+    )
+    results = CampusRetriever(AggregateVectorstore(), settings).retrieve("港中深有哪些专业？")
+    assert [item.document for item in results] == ["培养方案.pdf", "专业乙.pdf", "专业丙.pdf"]

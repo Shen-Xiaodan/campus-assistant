@@ -18,7 +18,7 @@ class TextChunk:
 class RetrievedEvidence:
     text: str
     document: str
-    page: int
+    page: int | None
     score: float
     metadata: dict[str, Any] = field(default_factory=dict)
 
@@ -29,9 +29,13 @@ class ChatRequest(BaseModel):
 
 class SourceResponse(BaseModel):
     document: str
-    page: int = Field(ge=1)
+    page: int | None = Field(default=None, ge=1)
     excerpt: str
     score: float = Field(ge=0, le=1)
+    source_type: str = "pdf"
+    url: str | None = None
+    section: str | None = None
+    crawled_at: str | None = None
 
 
 class ChatResponse(BaseModel):

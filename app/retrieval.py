@@ -39,6 +39,17 @@ QUERY_SYNONYM_GROUPS: tuple[tuple[str, ...], ...] = (
     ),
 )
 
+# High-precision signals for questions whose answer normally requires collecting
+# facts across several documents. Avoid matching a bare ``哪些`` so questions
+# such as “申请奖学金需要满足哪些条件” keep the focused retrieval path.
+AGGREGATE_QUERY_PATTERNS: tuple[re.Pattern[str], ...] = (
+    re.compile(r"(?:有|包含|开设|提供)(?:哪|什么)(?:些|几)(?:专业|课程|项目|学院|学系|部门|方向|服务|设施)"),
+    re.compile(r"(?:全部|所有|完整)(?:的)?(?:专业|课程|项目|学院|学系|部门|方向|服务|设施|清单|列表)"),
+    re.compile(r"(?:列出|罗列|汇总|盘点).{0,12}(?:专业|课程|项目|学院|学系|部门|方向|服务|设施)"),
+    re.compile(r"\b(?:list|all)\b.{0,40}\b(?:majors?|programmes?|programs?|courses?|departments?|services?)\b", re.I),
+    re.compile(r"\bwhat\b.{0,40}\b(?:majors?|programmes?|programs?|courses?)\b.{0,20}\b(?:offer|available)\w*\b", re.I),
+)
+
 
 def normalize_search_text(text: str) -> str:
     normalized = unicodedata.normalize("NFKC", text).lower()
@@ -56,6 +67,12 @@ def expand_query(query: str) -> list[str]:
         ):
             variants.extend(group)
     return list(dict.fromkeys(variants))
+
+
+def is_aggregate_query(query: str) -> bool:
+    """Return whether a question asks for a multi-item catalogue or summary."""
+    normalized = normalize_search_text(query)
+    return any(pattern.search(normalized) for pattern in AGGREGATE_QUERY_PATTERNS)
 
 
 def _tokens(text: str) -> list[str]:
@@ -76,13 +93,43 @@ def keyword_score(query: str, text: str) -> float:
 
 
 def deduplicate_evidence(items: Iterable[RetrievedEvidence], top_k: int) -> list[RetrievedEvidence]:
-    best: dict[tuple[str, int, str], RetrievedEvidence] = {}
+    best: dict[tuple[str, int | None, str], RetrievedEvidence] = {}
     for item in items:
         normalized = re.sub(r"\s+", " ", item.text).strip().lower()
         key = (item.document, item.page, normalized)
         if key not in best or item.score > best[key].score:
             best[key] = item
     return sorted(best.values(), key=lambda item: item.score, reverse=True)[:top_k]
+
+
+def diversify_evidence(
+    items: Iterable[RetrievedEvidence],
+    top_k: int,
+    max_chunks_per_document: int,
+) -> list[RetrievedEvidence]:
+    """Select strong evidence in rounds so one document cannot fill every slot."""
+    deduplicated = deduplicate_evidence(items, top_k=10**9)
+    groups: dict[str, list[RetrievedEvidence]] = {}
+    document_order: list[str] = []
+    for item in deduplicated:
+        identity = str(item.metadata.get("source_url") or item.document)
+        if identity not in groups:
+            groups[identity] = []
+            document_order.append(identity)
+        groups[identity].append(item)
+
+    selected: list[RetrievedEvidence] = []
+    for chunk_index in range(max_chunks_per_document):
+        round_items = [
+            groups[identity][chunk_index]
+            for identity in document_order
+            if len(groups[identity]) > chunk_index
+        ]
+        round_items.sort(key=lambda item: item.score, reverse=True)
+        selected.extend(round_items[: max(0, top_k - len(selected))])
+        if len(selected) >= top_k:
+            break
+    return selected
 
 
 def distance_to_relevance(distance: float, metric: str) -> float:
@@ -107,21 +154,29 @@ class CampusRetriever:
     @staticmethod
     def _evidence(document: Any, score: float) -> RetrievedEvidence:
         metadata = dict(getattr(document, "metadata", {}) or {})
+        source_type = str(metadata.get("source_type", "pdf"))
         return RetrievedEvidence(
             text=getattr(document, "page_content", ""),
             document=str(metadata.get("document", "未知文档")),
-            page=max(1, int(metadata.get("page", 1))),
+            page=None if source_type == "web" else max(1, int(metadata.get("page", 1))),
             score=max(0.0, min(1.0, float(score))),
             metadata=metadata,
         )
 
     def retrieve(self, query: str) -> list[RetrievedEvidence]:
+        aggregate_query = is_aggregate_query(query)
+        fetch_k = self.settings.aggregate_fetch_k if aggregate_query else self.settings.fetch_k
+        top_k = self.settings.aggregate_top_k if aggregate_query else self.settings.top_k
         query_variants = expand_query(query)
         vector_results: dict[tuple[str, int, str], tuple[Any, float]] = {}
         for variant in query_variants:
-            for document, distance in self.vectorstore.similarity_search_with_score(variant, k=self.settings.fetch_k):
+            for document, distance in self.vectorstore.similarity_search_with_score(variant, k=fetch_k):
                 metadata = document.metadata or {}
-                key = (str(metadata.get("document", "")), int(metadata.get("page", 1)), document.page_content)
+                key = (
+                    str(metadata.get("source_url") or metadata.get("document", "")),
+                    int(metadata.get("page", 1)),
+                    document.page_content,
+                )
                 relevance = distance_to_relevance(distance, self.settings.distance_metric)
                 previous = vector_results.get(key)
                 if previous is None or relevance > previous[1]:
@@ -149,8 +204,14 @@ class CampusRetriever:
                     holder = type("Document", (), {"page_content": text, "metadata": metadata})()
                     keyword_candidates.append(self._evidence(holder, score))
             merged.extend(
-                sorted(keyword_candidates, key=lambda item: item.score, reverse=True)[: self.settings.fetch_k]
+                sorted(keyword_candidates, key=lambda item: item.score, reverse=True)[:fetch_k]
             )
 
         eligible = [item for item in merged if item.score >= self.settings.similarity_threshold]
-        return deduplicate_evidence(eligible, self.settings.top_k)
+        if aggregate_query:
+            return diversify_evidence(
+                eligible,
+                top_k=top_k,
+                max_chunks_per_document=self.settings.aggregate_max_chunks_per_document,
+            )
+        return deduplicate_evidence(eligible, top_k)

@@ -11,6 +11,7 @@ class FakeModel:
 
 def test_citation_format():
     assert citation_label("学生手册.pdf", 12) == "【学生手册.pdf，第 12 页】"
+    assert citation_label("图书馆官网", None, "开放时间") == "【图书馆官网，开放时间】"
 
 
 def test_low_relevance_empty_evidence_refuses_without_model_call():
@@ -27,6 +28,32 @@ def test_grounded_answer_returns_bounded_sources():
     assert result.sources[0].document == "学生手册.pdf"
     assert result.sources[0].page == 12
     assert len(result.sources[0].excerpt) <= 30
+
+
+def test_web_evidence_returns_url_and_section():
+    class WebModel:
+        def invoke(self, prompt: str) -> str:
+            assert "【图书馆官网，开放时间】" in prompt
+            return "图书馆周一开放。【图书馆官网，开放时间】"
+
+    item = RetrievedEvidence(
+        "页面：图书馆官网\n章节：开放时间\n周一开放。",
+        "图书馆官网",
+        None,
+        0.81,
+        {
+            "source_type": "web",
+            "source_url": "https://library.example.edu.cn/hours",
+            "section": "开放时间",
+            "crawled_at": "2026-08-12T00:00:00+00:00",
+        },
+    )
+    result = AnswerGenerator(Settings(), model=WebModel()).answer("图书馆何时开放？", [item])
+
+    assert result.sources[0].page is None
+    assert result.sources[0].source_type == "web"
+    assert result.sources[0].url == "https://library.example.edu.cn/hours"
+    assert result.sources[0].section == "开放时间"
 
 
 def test_openai_compatible_provider_request(monkeypatch):
