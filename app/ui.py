@@ -47,6 +47,15 @@ st.markdown(
 
         [data-testid="stHeader"] { background: transparent; }
 
+        /* Hide Streamlit's development controls while keeping the sidebar
+           collapse/expand control available on smaller screens. */
+        [data-testid="stToolbar"],
+        [data-testid="stDecoration"],
+        [data-testid="stStatusWidget"],
+        .stDeployButton {
+            display: none !important;
+        }
+
         [data-testid="stAppViewContainer"] > .main .block-container {
             max-width: 820px;
             padding-top: 4.2rem;
