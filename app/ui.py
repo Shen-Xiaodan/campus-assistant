@@ -13,6 +13,11 @@ EXAMPLES = [
     "学生证丢失后应该如何补办？",
     "申请奖学金需要满足哪些条件？",
 ]
+PROVIDER_PRESETS = {
+    "硅基流动": "https://api.siliconflow.cn/v1",
+    "OpenAI": "https://api.openai.com/v1",
+    "其他兼容服务": "",
+}
 
 st.set_page_config(
     page_title="校园问答 · Campus Guide",
@@ -72,7 +77,6 @@ st.markdown(
         }
 
         .sidebar-brand {
-            min-height: calc(100vh - 7rem);
             display: flex;
             flex-direction: column;
         }
@@ -138,7 +142,7 @@ st.markdown(
             color: #8c9088;
             font-size: .58rem;
             letter-spacing: .14em;
-            margin-top: auto;
+            margin-top: 2rem;
             padding-top: 1.2rem;
             text-transform: uppercase;
         }
@@ -294,6 +298,25 @@ st.markdown(
         .stAlert { border-radius: 2px; }
         .stAlert p { color: var(--ink); }
 
+        .model-status {
+            border-top: 1px solid var(--line);
+            color: var(--muted);
+            font-size: .72rem;
+            line-height: 1.7;
+            margin-top: 1.2rem;
+            padding-top: 1rem;
+        }
+
+        [data-testid="stSidebar"] [data-testid="stExpander"] {
+            background: rgba(255, 254, 250, .55);
+            margin-top: 1.6rem;
+        }
+
+        [data-testid="stSidebar"] .stButton > button {
+            border-color: var(--line);
+            border-radius: 3px;
+        }
+
         @media (max-width: 640px) {
             [data-testid="stAppViewContainer"] > .main .block-container {
                 padding-top: 2.2rem;
@@ -307,6 +330,36 @@ st.markdown(
 
 if "messages" not in st.session_state:
     st.session_state.messages = []
+if "model_connected" not in st.session_state:
+    st.session_state.model_connected = False
+if "model_api_key" not in st.session_state:
+    st.session_state.model_api_key = ""
+if "model_id" not in st.session_state:
+    st.session_state.model_id = ""
+if "model_base_url" not in st.session_state:
+    st.session_state.model_base_url = PROVIDER_PRESETS["硅基流动"]
+
+
+def current_model_config() -> dict[str, str] | None:
+    values = {
+        "provider": "openai-compatible",
+        "api_key": st.session_state.model_api_key.strip(),
+        "base_url": st.session_state.model_base_url.strip(),
+        "model_id": st.session_state.model_id.strip(),
+    }
+    return values if all(values.values()) else None
+
+
+def mark_model_changed() -> None:
+    st.session_state.model_connected = False
+
+
+def reset_model_config() -> None:
+    st.session_state.model_provider = "硅基流动"
+    st.session_state.model_api_key = ""
+    st.session_state.model_id = ""
+    st.session_state.model_base_url = PROVIDER_PRESETS["硅基流动"]
+    st.session_state.model_connected = False
 
 with st.sidebar:
     st.markdown(
@@ -325,6 +378,59 @@ with st.sidebar:
         """,
         unsafe_allow_html=True,
     )
+    with st.expander("模型设置", expanded=current_model_config() is None):
+        st.caption("使用你自己的 OpenAI-compatible 模型服务。配置仅保留在当前会话中。")
+        provider = st.selectbox(
+            "服务商",
+            list(PROVIDER_PRESETS),
+            key="model_provider",
+            on_change=mark_model_changed,
+        )
+        preset_url = PROVIDER_PRESETS[provider]
+        if preset_url and st.session_state.model_base_url != preset_url:
+            st.session_state.model_base_url = preset_url
+            st.session_state.model_connected = False
+        st.text_input(
+            "API 地址",
+            key="model_base_url",
+            placeholder="https://api.example.com/v1",
+            on_change=mark_model_changed,
+        )
+        st.text_input("模型 ID", key="model_id", placeholder="例如 Qwen/Qwen3-32B", on_change=mark_model_changed)
+        st.text_input("API Key", key="model_api_key", type="password", on_change=mark_model_changed)
+        check_column, reset_column = st.columns(2)
+        with check_column:
+            check_clicked = st.button("检测连接", use_container_width=True, type="primary")
+        with reset_column:
+            st.button("重置", use_container_width=True, on_click=reset_model_config)
+
+        if check_clicked:
+            model_config = current_model_config()
+            if model_config is None:
+                st.warning("请先完整填写 API 地址、模型 ID 和 API Key。")
+            else:
+                try:
+                    with st.spinner("正在检测……"):
+                        check_response = requests.post(
+                            f"{API_URL}/model/check",
+                            json={"model": model_config},
+                            timeout=25,
+                        )
+                    if check_response.status_code == 422:
+                        raise RuntimeError("配置格式不正确，请检查 API 地址和模型 ID。")
+                    check_response.raise_for_status()
+                    st.session_state.model_connected = True
+                    st.success("连接正常，可以开始提问。")
+                except RuntimeError as exc:
+                    st.session_state.model_connected = False
+                    st.warning(str(exc))
+                except (requests.RequestException, ValueError):
+                    st.session_state.model_connected = False
+                    st.warning("暂时无法连接该模型，请检查地址、密钥和模型 ID。")
+        elif st.session_state.model_connected:
+            st.success("连接正常，可以开始提问。")
+        else:
+            st.markdown('<div class="model-status">尚未检测连接</div>', unsafe_allow_html=True)
 
 st.markdown(
     """
@@ -337,6 +443,9 @@ st.markdown(
     """,
     unsafe_allow_html=True,
 )
+
+if current_model_config() is None:
+    st.info("准备好后，请先在左侧填写你自己的模型 API。配置只用于当前会话，不会保存到项目中。")
 
 if not st.session_state.messages:
     with st.chat_message("assistant"):
@@ -386,6 +495,10 @@ typed_question = st.chat_input("询问校园规章、办事流程或学生服务
 question = selected_example if selected_example is not None else typed_question
 
 if question:
+    model_config = current_model_config()
+    if model_config is None:
+        st.info("开始提问前，请先在左侧配置你自己的模型服务。密钥仅用于当前会话中的模型请求。")
+        st.stop()
     request_history = [
         {"role": message["role"], "content": message["content"]}
         for message in st.session_state.messages[-6:]
@@ -398,7 +511,7 @@ if question:
             with st.spinner("正在查阅校园资料……"):
                 api_response = requests.post(
                     f"{API_URL}/chat",
-                    json={"question": question, "history": request_history},
+                    json={"question": question, "history": request_history, "model": model_config},
                     timeout=90,
                 )
                 if api_response.status_code == 503:

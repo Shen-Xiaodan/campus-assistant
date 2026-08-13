@@ -1,6 +1,6 @@
 from app.config import Settings
 from app.generation import REFUSAL_ANSWER, AnswerGenerator, OpenAICompatibleChatModel, citation_label, cited_evidence
-from app.models import ChatHistoryMessage, RetrievedEvidence
+from app.models import ChatHistoryMessage, ModelConnection, RetrievedEvidence
 
 
 class FakeModel:
@@ -112,3 +112,35 @@ def test_openai_compatible_provider_request(monkeypatch):
     assert captured["json"]["model"] == "demo/model"
     assert captured["json"]["messages"][0]["content"] == "校园问题"
     assert captured["timeout"] == 30
+
+
+def test_request_connection_overrides_shared_model(monkeypatch):
+    captured = {}
+
+    class FakeResponse:
+        def raise_for_status(self):
+            return None
+
+        def json(self):
+            return {"choices": [{"message": {"content": "回答。【学生手册.pdf，第 12 页】"}}]}
+
+    def fake_post(url, headers, json, timeout):
+        captured.update(url=url, authorization=headers["Authorization"], model=json["model"])
+        return FakeResponse()
+
+    monkeypatch.setattr("app.generation.requests.post", fake_post)
+    connection = ModelConnection(
+        api_key="user-secret",
+        base_url="https://api.example.com/v1",
+        model_id="user-model",
+    )
+    evidence = RetrievedEvidence("学生事务说明", "学生手册.pdf", 12, 0.9)
+    result = AnswerGenerator(Settings(), model=FakeModel()).answer("问题", [evidence], connection=connection)
+
+    assert result.grounded is True
+    assert captured == {
+        "url": "https://api.example.com/v1/chat/completions",
+        "authorization": "Bearer user-secret",
+        "model": "user-model",
+    }
+    assert "user-secret" not in repr(connection)

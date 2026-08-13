@@ -11,6 +11,7 @@
 - 汇总问题的多文档召回与专业资料精确过滤
 - 只展示答案实际引用的来源
 - 最近对话上下文，支持“还有呢”“详细一点”等追问
+- 用户在页面内配置自己的模型 API，支持连通性检测与重置
 - FastAPI 接口与 Streamlit 对话界面
 
 回答仅基于已收录资料；证据不足时会提示用户补充信息，不使用模型知识猜测校园事实。
@@ -30,7 +31,9 @@ pip install -r requirements.txt
 cp .env.example .env
 ```
 
-在 `.env` 中填写模型服务配置：
+模型 API 默认由访问者在页面左侧自行配置，部署者无需提供共享额度。API Key 仅保留在当前 Streamlit 会话中，随本次请求发送给后端，不写入项目文件或数据库。
+
+以下服务端模型配置只供 CLI 或内部调用兼容使用，公开 `/chat` 接口仍要求每次请求提供用户模型配置：
 
 ```env
 LLM_PROVIDER=siliconflow
@@ -79,6 +82,12 @@ curl -X POST http://127.0.0.1:8000/chat \
   -H 'Content-Type: application/json' \
   -d '{
     "question": "还有哪些？",
+    "model": {
+      "provider": "openai-compatible",
+      "api_key": "your_api_key",
+      "base_url": "https://api.siliconflow.cn/v1",
+      "model_id": "Qwen/Qwen3-32B"
+    },
     "history": [
       {"role": "user", "content": "金融学有哪些必修课？"},
       {"role": "assistant", "content": "目前能确认的是……"}

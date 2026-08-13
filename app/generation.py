@@ -8,7 +8,7 @@ import requests
 
 from app.config import Settings
 from app.exceptions import GenerationUnavailableError
-from app.models import ChatHistoryMessage, ChatResponse, RetrievedEvidence, SourceResponse
+from app.models import ChatHistoryMessage, ChatResponse, ModelConnection, RetrievedEvidence, SourceResponse
 
 REFUSAL_ANSWER = (
     "抱歉，我暂时没能从现有校园资料中找到足够信息来确认这个问题。"
@@ -49,6 +49,20 @@ class OpenAICompatibleChatModel:
             status = getattr(getattr(exc, "response", None), "status_code", None)
             suffix = f"（HTTP {status}）" if status else ""
             raise GenerationUnavailableError(f"OpenAI-compatible 模型调用失败{suffix}") from exc
+
+
+def model_from_connection(connection: ModelConnection, timeout: float) -> OpenAICompatibleChatModel:
+    """Build a request-scoped client so credentials are never shared across users."""
+    return OpenAICompatibleChatModel(
+        api_key=connection.api_key.get_secret_value(),
+        base_url=connection.base_url,
+        model=connection.model_id,
+        timeout=timeout,
+    )
+
+
+def check_model_connection(connection: ModelConnection, timeout: float = 20.0) -> None:
+    model_from_connection(connection, timeout).invoke("请只回复 OK。")
 
 
 def citation_label(document: str, page: int | None, section: str | None = None) -> str:
@@ -108,7 +122,9 @@ class AnswerGenerator:
         self.settings = settings
         self.model = model
 
-    def _get_model(self) -> TextGenerator:
+    def _get_model(self, connection: ModelConnection | None = None) -> TextGenerator:
+        if connection is not None:
+            return model_from_connection(connection, self.settings.llm_timeout)
         if self.model is not None:
             return self.model
         if self.settings.llm_provider in {"siliconflow", "nvidia", "openai", "openai-compatible"}:
@@ -142,10 +158,11 @@ class AnswerGenerator:
         question: str,
         evidence: list[RetrievedEvidence],
         history: list[ChatHistoryMessage] | None = None,
+        connection: ModelConnection | None = None,
     ) -> ChatResponse:
         if not evidence:
             return ChatResponse(answer=REFUSAL_ANSWER, sources=[], grounded=False)
-        text = _content(self._get_model().invoke(build_prompt(question, evidence, history)))
+        text = _content(self._get_model(connection).invoke(build_prompt(question, evidence, history)))
         if not text or text == REFUSAL_ANSWER:
             return ChatResponse(answer=REFUSAL_ANSWER, sources=[], grounded=False)
         referenced = cited_evidence(text, evidence)
