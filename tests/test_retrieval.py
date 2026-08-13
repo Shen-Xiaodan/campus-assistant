@@ -52,6 +52,16 @@ def test_query_expansion_adds_chinese_english_course_aliases():
     assert "生命科学" in bio_variants
 
 
+def test_query_expansion_supports_common_bilingual_campus_terms():
+    english_variants = expand_query("Where can I replace my student card?")
+    chinese_variants = expand_query("奖学金申请条件是什么？")
+
+    assert "学生证" in english_variants
+    assert "校园卡" in english_variants
+    assert "scholarship" in chinese_variants
+    assert "financial aid" in chinese_variants
+
+
 def test_aggregate_query_detection_is_high_precision():
     assert is_aggregate_query("港中深有哪些专业？")
     assert is_aggregate_query("请列出学校全部课程")

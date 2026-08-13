@@ -42,6 +42,8 @@ class SourceResponse(BaseModel):
     url: str | None = None
     section: str | None = None
     crawled_at: str | None = None
+    department_zh: str | None = None
+    department_en: str | None = None
 
 
 class ChatResponse(BaseModel):

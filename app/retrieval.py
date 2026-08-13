@@ -18,6 +18,17 @@ _T2S = OpenCC("t2s")
 # real evaluation failures are discovered instead of asking the LLM to rewrite
 # every query before retrieval.
 QUERY_SYNONYM_GROUPS: tuple[tuple[str, ...], ...] = (
+    ("学生事务处", "学生事务", "student affairs", "office of student affairs", "osa"),
+    ("教务处", "教务", "registry", "academic affairs"),
+    ("图书馆", "library"),
+    ("奖学金", "scholarship", "financial aid"),
+    ("学生证", "校园卡", "student card", "campus card"),
+    ("培养方案", "修读计划", "programme requirements", "program requirements", "study scheme"),
+    ("必修课", "必修课程", "required course", "required courses", "compulsory course"),
+    ("选修课", "选修课程", "elective", "elective course", "elective courses"),
+    ("学分", "credit", "credits"),
+    ("本科生", "本科", "undergraduate", "undergraduates"),
+    ("研究生", "硕士生", "博士生", "postgraduate", "graduate student", "graduate students"),
     (
         "游戏",
         "游戏制作",

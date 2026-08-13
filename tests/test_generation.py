@@ -1,5 +1,12 @@
 from app.config import Settings
-from app.generation import REFUSAL_ANSWER, AnswerGenerator, OpenAICompatibleChatModel, citation_label, cited_evidence
+from app.generation import (
+    REFUSAL_ANSWER,
+    REFUSAL_ANSWER_EN,
+    AnswerGenerator,
+    OpenAICompatibleChatModel,
+    citation_label,
+    cited_evidence,
+)
 from app.models import ChatHistoryMessage, RetrievedEvidence
 
 
@@ -30,11 +37,28 @@ def test_prompt_is_friendly_and_includes_recent_conversation():
     assert "问题：还有呢？" in prompt
 
 
+def test_english_question_requests_english_answer_and_preserves_citations():
+    from app.generation import build_prompt
+
+    item = RetrievedEvidence("奖学金申请条件", "学生手册.pdf", 8, 0.9)
+    prompt = build_prompt("How can I apply for a scholarship?", [item])
+
+    assert "Answer in natural, friendly English" in prompt
+    assert "preserve document titles and citation labels exactly" in prompt
+    assert "【学生手册.pdf，第 8 页】" in prompt
+    assert REFUSAL_ANSWER_EN in prompt
+
+
 def test_low_relevance_empty_evidence_refuses_without_model_call():
     result = AnswerGenerator(Settings(), model=FakeModel()).answer("未知问题", [])
     assert result.answer == REFUSAL_ANSWER
     assert result.grounded is False
     assert result.sources == []
+
+
+def test_english_empty_evidence_returns_english_refusal():
+    result = AnswerGenerator(Settings(), model=FakeModel()).answer("Where is the Registry?", [])
+    assert result.answer == REFUSAL_ANSWER_EN
 
 
 def test_grounded_answer_returns_bounded_sources():
@@ -81,6 +105,7 @@ def test_web_evidence_returns_url_and_section():
             "source_url": "https://library.example.edu.cn/hours",
             "section": "开放时间",
             "crawled_at": "2026-08-12T00:00:00+00:00",
+            "department": "图书馆",
         },
     )
     result = AnswerGenerator(Settings(), model=WebModel()).answer("图书馆何时开放？", [item])
@@ -89,6 +114,8 @@ def test_web_evidence_returns_url_and_section():
     assert result.sources[0].source_type == "web"
     assert result.sources[0].url == "https://library.example.edu.cn/hours"
     assert result.sources[0].section == "开放时间"
+    assert result.sources[0].department_zh == "图书馆"
+    assert result.sources[0].department_en == "Library"
 
 
 def test_openai_compatible_provider_request(monkeypatch):
