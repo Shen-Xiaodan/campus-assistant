@@ -1,5 +1,10 @@
 [
-  {"document":"学生手册.pdf","page":12,"text":"学生证丢失后，应向学生事务中心提交补办申请，办理时需要携带身份证明。"},
-  {"document":"图书馆指南.pdf","page":3,"text":"图书馆工作日开放时间为 8:00 至 22:00，周末开放时间为 9:00 至 20:00。"},
-  {"document":"奖学金办法.pdf","page":5,"text":"奖学金申请人应遵守校纪校规，并按要求提交申请材料。"}
+  {"document":"学生手册.pdf","page":12,"text":"学生证丢失后，应向学生事务中心提交补办申请，办理时需要携带身份证明。Student card replacement applications are handled by the Office of Student Affairs."},
+  {"document":"图书馆指南.pdf","page":3,"text":"图书馆工作日开放时间为 8:00 至 22:00，周末开放时间为 9:00 至 20:00。Library hours are 8:00–22:00 on weekdays and 9:00–20:00 on weekends."},
+  {"document":"奖学金办法.pdf","page":5,"text":"奖学金申请人应提交申请表和成绩单，并遵守校纪校规。Scholarship applicants must submit an application form and academic transcript."},
+  {"document":"教务服务指南.pdf","page":2,"text":"教务处 Registry 位于教学楼 A 栋，可通过 registry@example.edu.cn 联系。The Registry is located in Teaching Building A."},
+  {"document":"金融学培养方案.pdf","page":1,"text":"金融学本科培养方案要求学生完成 120 学分。The Finance undergraduate programme requires 120 credits."},
+  {"document":"金融学培养方案.pdf","page":4,"text":"金融学专业必修课程包括公司金融和投资学。Required Finance courses include Corporate Finance and Investments."},
+  {"document":"校园服务指南.pdf","page":8,"text":"校医务室提供日常健康咨询和基础医疗服务。"},
+  {"document":"研究生手册.pdf","page":6,"text":"研究生院负责研究生学籍和培养事务。The Graduate School manages postgraduate registration and study matters."}
 ]

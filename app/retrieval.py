@@ -4,8 +4,9 @@ from __future__ import annotations
 
 import re
 import unicodedata
-from collections import Counter
-from typing import Any, Iterable
+from collections import Counter, defaultdict
+from math import log
+from typing import Any, Iterable, Protocol, Sequence
 
 from opencc import OpenCC
 
@@ -124,6 +125,92 @@ def keyword_score(query: str, text: str) -> float:
     return min(1.0, matched / sum(query_counts.values()))
 
 
+class BM25Index:
+    """Small in-memory BM25 index built once from the persisted Chroma corpus."""
+
+    def __init__(self, documents: Sequence[str], k1: float = 1.5, b: float = 0.75):
+        self.documents = list(documents)
+        self.k1 = k1
+        self.b = b
+        self.tokens = [_tokens(document) for document in self.documents]
+        self.lengths = [len(tokens) for tokens in self.tokens]
+        self.average_length = sum(self.lengths) / len(self.lengths) if self.lengths else 0.0
+        document_frequencies: Counter[str] = Counter()
+        for tokens in self.tokens:
+            document_frequencies.update(set(tokens))
+        count = len(self.documents)
+        self.idf = {
+            token: log(1 + (count - frequency + 0.5) / (frequency + 0.5))
+            for token, frequency in document_frequencies.items()
+        }
+
+    def search(self, query_variants: Sequence[str], top_k: int) -> list[tuple[int, float]]:
+        query_tokens = list(dict.fromkeys(token for variant in query_variants for token in _tokens(variant)))
+        scores: list[tuple[int, float]] = []
+        for index, tokens in enumerate(self.tokens):
+            frequencies = Counter(tokens)
+            length_normalization = 1 - self.b
+            if self.average_length:
+                length_normalization += self.b * self.lengths[index] / self.average_length
+            score = 0.0
+            for token in query_tokens:
+                frequency = frequencies[token]
+                if not frequency:
+                    continue
+                numerator = frequency * (self.k1 + 1)
+                denominator = frequency + self.k1 * length_normalization
+                score += self.idf.get(token, 0.0) * numerator / denominator
+            if score > 0:
+                scores.append((index, score))
+        return sorted(scores, key=lambda item: item[1], reverse=True)[:top_k]
+
+
+class Reranker(Protocol):
+    def rank(self, query: str, evidence: Sequence[RetrievedEvidence]) -> list[float]: ...
+
+
+class BGEReranker:
+    """Lazy FlagEmbedding adapter; only imported when reranking is enabled."""
+
+    def __init__(self, model_name: str):
+        try:
+            from FlagEmbedding import FlagReranker
+        except ImportError as exc:
+            raise RuntimeError("启用 reranker 需要安装 FlagEmbedding") from exc
+        self.model = FlagReranker(model_name, use_fp16=False)
+
+    def rank(self, query: str, evidence: Sequence[RetrievedEvidence]) -> list[float]:
+        scores = self.model.compute_score([[query, item.text] for item in evidence], normalize=True)
+        return [float(scores)] if isinstance(scores, (float, int)) else [float(score) for score in scores]
+
+
+def reciprocal_rank_fusion(
+    rankings: Sequence[Sequence[RetrievedEvidence]],
+    rrf_k: int = 60,
+) -> list[RetrievedEvidence]:
+    scores: defaultdict[tuple[str, int | None, str], float] = defaultdict(float)
+    evidence_by_key: dict[tuple[str, int | None, str], RetrievedEvidence] = {}
+    for ranking in rankings:
+        for rank, item in enumerate(ranking, start=1):
+            key = (item.document, item.page, item.text)
+            scores[key] += 1 / (rrf_k + rank)
+            evidence_by_key[key] = item
+    if not scores:
+        return []
+    max_score = max(scores.values())
+    fused = [
+        RetrievedEvidence(
+            text=evidence_by_key[key].text,
+            document=evidence_by_key[key].document,
+            page=evidence_by_key[key].page,
+            score=score / max_score,
+            metadata=evidence_by_key[key].metadata,
+        )
+        for key, score in scores.items()
+    ]
+    return sorted(fused, key=lambda item: item.score, reverse=True)
+
+
 def deduplicate_evidence(items: Iterable[RetrievedEvidence], top_k: int) -> list[RetrievedEvidence]:
     best: dict[tuple[str, int | None, str], RetrievedEvidence] = {}
     for item in items:
@@ -179,9 +266,14 @@ def distance_to_relevance(distance: float, metric: str) -> float:
 
 
 class CampusRetriever:
-    def __init__(self, vectorstore: Any, settings: Settings):
+    def __init__(self, vectorstore: Any, settings: Settings, reranker: Reranker | None = None):
         self.vectorstore = vectorstore
         self.settings = settings
+        raw = self.vectorstore.get(include=["documents", "metadatas"])
+        self.documents = list(raw.get("documents", []))
+        self.metadatas = list(raw.get("metadatas", []))
+        self.bm25 = BM25Index(self.documents)
+        self.reranker = reranker
 
     @staticmethod
     def _evidence(document: Any, score: float) -> RetrievedEvidence:
@@ -200,8 +292,7 @@ class CampusRetriever:
         fetch_k = self.settings.aggregate_fetch_k if aggregate_query else self.settings.fetch_k
         top_k = self.settings.aggregate_top_k if aggregate_query else self.settings.top_k
         query_variants = expand_query(query)
-        raw = self.vectorstore.get(include=["documents", "metadatas"])
-        target_documents = matching_study_scheme_documents(query, raw.get("metadatas", []))
+        target_documents = matching_study_scheme_documents(query, self.metadatas)
         vector_results: dict[tuple[str, int, str], tuple[Any, float]] = {}
         for variant in query_variants:
             for document, distance in self.vectorstore.similarity_search_with_score(variant, k=fetch_k):
@@ -216,33 +307,51 @@ class CampusRetriever:
                 if previous is None or relevance > previous[1]:
                     vector_results[key] = (document, relevance)
 
-        merged: list[RetrievedEvidence] = []
-        seen_texts: set[str] = set()
+        vector_ranking: list[RetrievedEvidence] = []
         for document, vector_score in vector_results.values():
-            lexical = (
-                max(keyword_score(variant, document.page_content) for variant in query_variants)
-                if self.settings.hybrid_search
-                else 0.0
-            )
-            combined = min(1.0, vector_score + self.settings.keyword_bonus_weight * lexical)
-            evidence = self._evidence(document, combined)
-            merged.append(evidence)
-            seen_texts.add(document.page_content)
+            vector_ranking.append(self._evidence(document, vector_score))
+        vector_ranking.sort(key=lambda item: item.score, reverse=True)
 
+        rankings = [vector_ranking[:fetch_k]]
         if self.settings.hybrid_search:
-            keyword_candidates: list[RetrievedEvidence] = []
-            for text, metadata in zip(raw.get("documents", []), raw.get("metadatas", []), strict=False):
-                score = max(keyword_score(variant, text) for variant in query_variants)
-                if score > 0 and text not in seen_texts:
-                    holder = type("Document", (), {"page_content": text, "metadata": metadata})()
-                    keyword_candidates.append(self._evidence(holder, score))
-            merged.extend(
-                sorted(keyword_candidates, key=lambda item: item.score, reverse=True)[:fetch_k]
-            )
+            bm25_ranking = []
+            for index, _score in self.bm25.search(query_variants, fetch_k):
+                lexical_relevance = max(
+                    keyword_score(variant, self.documents[index]) for variant in query_variants
+                )
+                if lexical_relevance < self.settings.similarity_threshold:
+                    continue
+                holder = type(
+                    "Document",
+                    (),
+                    {"page_content": self.documents[index], "metadata": self.metadatas[index]},
+                )()
+                bm25_ranking.append(self._evidence(holder, lexical_relevance))
+            rankings.append(bm25_ranking)
 
-        eligible = [item for item in merged if item.score >= self.settings.similarity_threshold]
+        eligible = reciprocal_rank_fusion(rankings, self.settings.rrf_k)
+        # A strong match in either candidate list remains eligible; the RRF
+        # score is for ordering and is normalized independently per query.
+        candidate_keys = {
+            (item.document, item.page, item.text)
+            for item in vector_ranking
+            if item.score >= self.settings.similarity_threshold
+        }
+        if len(rankings) > 1:
+            candidate_keys.update((item.document, item.page, item.text) for item in rankings[1])
+        eligible = [item for item in eligible if (item.document, item.page, item.text) in candidate_keys]
         if target_documents:
             eligible = [item for item in eligible if item.document in target_documents]
+
+        if self.settings.reranker_enabled:
+            reranker = self.reranker or BGEReranker(self.settings.reranker_model)
+            candidates = eligible[: self.settings.reranker_candidates]
+            reranker_scores = reranker.rank(query, candidates)
+            eligible = [
+                RetrievedEvidence(item.text, item.document, item.page, score, item.metadata)
+                for item, score in zip(candidates, reranker_scores, strict=True)
+            ]
+            eligible.sort(key=lambda item: item.score, reverse=True)
         if aggregate_query:
             return diversify_evidence(
                 eligible,

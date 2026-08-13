@@ -1,4 +1,12 @@
 {"question":"学生证丢失后如何补办？","reference_answer":"向学生事务中心提交补办申请并携带身份证明。","relevant_document":"学生手册.pdf","relevant_pages":[12],"should_refuse":false}
+{"question":"How do I replace my lost student card?","reference_answer":"Submit an application to the Office of Student Affairs with identification.","relevant_document":"学生手册.pdf","relevant_pages":[12],"should_refuse":false}
 {"question":"图书馆工作日几点开放？","reference_answer":"图书馆工作日 8:00 开放。","relevant_document":"图书馆指南.pdf","relevant_pages":[3],"should_refuse":false}
+{"question":"What are the library opening hours on weekends?","reference_answer":"The library is open from 9:00 to 20:00 on weekends.","relevant_document":"图书馆指南.pdf","relevant_pages":[3],"should_refuse":false}
+{"question":"奖学金申请需要提交什么材料？","reference_answer":"提交申请表和成绩单。","relevant_document":"奖学金办法.pdf","relevant_pages":[5],"should_refuse":false}
+{"question":"Where is the Registry and how can I contact it?","reference_answer":"The Registry is in Teaching Building A and can be contacted by email.","relevant_document":"教务服务指南.pdf","relevant_pages":[2],"should_refuse":false}
+{"question":"金融学培养方案要求多少学分？","reference_answer":"金融学本科培养方案要求完成 120 学分。","relevant_document":"金融学培养方案.pdf","relevant_pages":[1],"should_refuse":false}
+{"question":"金融学有哪些必修课？","reference_answer":"必修课包括公司金融和投资学。","relevant_document":"金融学培养方案.pdf","relevant_pages":[4],"should_refuse":false}
 {"question":"学校附近哪家火锅店最好吃？","reference_answer":"当前校园资料无法确定。","relevant_document":null,"relevant_pages":[],"should_refuse":true}
-{"question":"奖学金申请截止日期是哪一天？","reference_answer":"当前示例资料没有提供截止日期。","relevant_document":null,"relevant_pages":[],"should_refuse":true}
+{"question":"明天深圳会不会下雨？","reference_answer":"当前校园资料无法确定。","relevant_document":null,"relevant_pages":[],"should_refuse":true}
+{"question":"Who will win the next World Cup?","reference_answer":"The campus sources cannot determine this.","relevant_document":null,"relevant_pages":[],"should_refuse":true}
+{"question":"奖学金申请截止日期是哪一天？","reference_answer":"当前资料没有提供截止日期，应检索奖学金办法后由生成层判断证据不足。","relevant_document":"奖学金办法.pdf","relevant_pages":[5],"should_refuse":false}

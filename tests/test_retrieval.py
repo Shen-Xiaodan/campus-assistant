@@ -3,6 +3,7 @@ import pytest
 from app.config import Settings
 from app.models import RetrievedEvidence
 from app.retrieval import (
+    BM25Index,
     CampusRetriever,
     deduplicate_evidence,
     distance_to_relevance,
@@ -12,6 +13,7 @@ from app.retrieval import (
     keyword_score,
     matching_study_scheme_documents,
     normalize_search_text,
+    reciprocal_rank_fusion,
 )
 
 
@@ -36,6 +38,21 @@ def test_keyword_score_prefers_matching_chinese_text():
     assert keyword_score("学生证如何补办", "学生证丢失后可以申请补办") > keyword_score(
         "学生证如何补办", "图书馆开放时间"
     )
+
+
+def test_bm25_ranks_exact_campus_term_above_unrelated_text():
+    index = BM25Index(["学生证丢失后申请补办", "图书馆开放时间", "奖学金申请材料"])
+    results = index.search(expand_query("How do I replace my student card?"), top_k=2)
+    assert results[0][0] == 0
+
+
+def test_rrf_rewards_candidates_found_by_both_retrievers():
+    vector_only = RetrievedEvidence("向量命中", "向量.pdf", 1, 0.9)
+    shared = RetrievedEvidence("共同命中", "共同.pdf", 2, 0.8)
+    bm25_only = RetrievedEvidence("词法命中", "词法.pdf", 3, 5.0)
+    fused = reciprocal_rank_fusion([[vector_only, shared], [bm25_only, shared]])
+    assert fused[0].document == "共同.pdf"
+    assert fused[0].score == 1.0
 
 
 def test_search_text_normalizes_traditional_chinese():
@@ -129,7 +146,7 @@ def test_retriever_uses_raw_cosine_distance_before_thresholding():
     results = CampusRetriever(FakeVectorstore(), settings).retrieve("Visual Analytics 的课程代码是什么？")
     assert len(results) == 1
     assert results[0].page == 3
-    assert results[0].score == 0.88
+    assert results[0].score == 1.0
 
 
 class AggregateVectorstore:
@@ -220,3 +237,21 @@ def test_explicit_programme_query_filters_other_programme_documents():
     results = CampusRetriever(ProgrammeVectorstore(), settings).retrieve("金融学的必修课")
     assert len(results) == 1
     assert results[0].document.startswith("金融学_")
+
+
+def test_optional_reranker_changes_candidate_order():
+    class ReverseReranker:
+        def rank(self, query, evidence):
+            return list(reversed(range(1, len(evidence) + 1)))
+
+    settings = Settings(
+        top_k=2,
+        fetch_k=4,
+        similarity_threshold=0.4,
+        hybrid_search=False,
+        reranker_enabled=True,
+    )
+    results = CampusRetriever(FakeVectorstore(), settings, reranker=ReverseReranker()).retrieve(
+        "Visual Analytics 的课程代码是什么？"
+    )
+    assert results[0].page == 3

@@ -18,7 +18,7 @@
 - Chroma 持久化向量索引，索引构建与问答服务解耦
 - 多语言 HuggingFace Embeddings
 - 中英文问题自动适配、常见校园术语跨语言检索与双语部门名称
-- 向量相关度与轻量关键词相关度融合、结果去重和阈值过滤
+- 向量与内存 BM25 各召回 20 条候选，通过 RRF 融合并支持可选 BGE reranker
 - 硅基流动 OpenAI-compatible 模型生成受证据约束的回答，并保留 NVIDIA/Groq 兼容分支
 - 文档名、页码、短证据片段及多个引用
 - 低相关度自动拒答，不调用模型猜测答案
@@ -204,7 +204,7 @@ curl -X POST http://127.0.0.1:8000/chat \
 
 ## 配置
 
-所有运行参数见 `.env.example`。常用参数包括 `EMBEDDING_MODEL`、`LLM_MODEL`、`DISTANCE_METRIC`、`CHUNK_SIZE`、`CHUNK_OVERLAP`、`TOP_K`、`FETCH_K`、`SIMILARITY_THRESHOLD`、`KEYWORD_BONUS_WEIGHT` 和 `HYBRID_SEARCH`。默认阈值为 `0.40`；向量相关度是基础分，关键词命中只作为加分项，避免词面不一致时反向压低向量结果。查询会先统一为简体中文进行词面匹配，并为已配置的校园领域概念补充简体、繁体和英文别名。对于“有哪些专业”“列出全部课程”等汇总型问题，系统会自动使用 `AGGREGATE_FETCH_K` 和 `AGGREGATE_TOP_K` 扩大召回，并通过 `AGGREGATE_MAX_CHUNKS_PER_DOCUMENT` 限制单份资料占用的证据数，优先覆盖不同文档；普通事实问题仍使用原来的 `FETCH_K` 和 `TOP_K`。默认使用归一化 embedding 与 cosine 距离；修改 embedding 模型、距离类型或切分参数后，应使用新的空 `INDEX_DIR` 重新构建索引，以免混用不兼容向量。索引 manifest 会记录这些配置，并在模型或切分配置变化时重新处理文档。
+所有运行参数见 `.env.example`。检索默认让向量和内存 BM25 各召回 `FETCH_K=20` 条候选，再通过 `RRF_K=60` 融合；普通问题返回 `TOP_K=4` 条，汇总问题返回 `AGGREGATE_TOP_K=10` 条。设置 `RERANKER_ENABLED=true` 后，可使用 `BAAI/bge-reranker-v2-m3` 对融合后的前 20 条候选重排；该功能默认关闭，因为首次使用需要安装 `FlagEmbedding` 并下载较大的模型。查询会统一为简体中文，并扩展常见校园中英术语。修改 embedding 模型、距离类型或切分参数后，应重新构建索引。
 
 ## 测试与评测
 
@@ -219,8 +219,9 @@ python -m app.evaluate
 
 单元测试中的模型和服务调用使用 fake/mock，不需要硅基流动、NVIDIA 或 Groq Key。离线评测使用 `evaluation/dataset.jsonl` 与 `evaluation/sample_corpus.json`，输出：
 
-- 检索命中率
-- 引用正确率
+- Recall@5
+- MRR@10
+- 正确页码命中率
 - 拒答准确率
 - 平均响应时间
 

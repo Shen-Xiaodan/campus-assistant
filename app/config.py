@@ -31,13 +31,17 @@ class Settings:
     chunk_size: int = 1000
     chunk_overlap: int = 150
     top_k: int = 4
-    fetch_k: int = 12
+    fetch_k: int = 20
     aggregate_top_k: int = 10
-    aggregate_fetch_k: int = 30
+    aggregate_fetch_k: int = 20
     aggregate_max_chunks_per_document: int = 2
     similarity_threshold: float = 0.40
     keyword_bonus_weight: float = 0.25
     hybrid_search: bool = True
+    rrf_k: int = 60
+    reranker_enabled: bool = False
+    reranker_model: str = "BAAI/bge-reranker-v2-m3"
+    reranker_candidates: int = 20
     max_excerpt_chars: int = 240
     log_level: str = "INFO"
 
@@ -78,6 +82,10 @@ class Settings:
             similarity_threshold=float(os.getenv("SIMILARITY_THRESHOLD", str(defaults.similarity_threshold))),
             keyword_bonus_weight=float(os.getenv("KEYWORD_BONUS_WEIGHT", str(defaults.keyword_bonus_weight))),
             hybrid_search=_env_bool("HYBRID_SEARCH", defaults.hybrid_search),
+            rrf_k=int(os.getenv("RRF_K", str(defaults.rrf_k))),
+            reranker_enabled=_env_bool("RERANKER_ENABLED", defaults.reranker_enabled),
+            reranker_model=os.getenv("RERANKER_MODEL", defaults.reranker_model),
+            reranker_candidates=int(os.getenv("RERANKER_CANDIDATES", str(defaults.reranker_candidates))),
             max_excerpt_chars=int(os.getenv("MAX_EXCERPT_CHARS", str(defaults.max_excerpt_chars))),
             log_level=os.getenv("LOG_LEVEL", defaults.log_level),
         )
@@ -95,6 +103,8 @@ class Settings:
             raise ValueError("SIMILARITY_THRESHOLD 必须位于 0 到 1 之间")
         if not 0 <= self.keyword_bonus_weight <= 1:
             raise ValueError("KEYWORD_BONUS_WEIGHT 必须位于 0 到 1 之间")
+        if self.rrf_k <= 0 or self.reranker_candidates <= 0:
+            raise ValueError("RRF_K 和 RERANKER_CANDIDATES 必须大于 0")
         if self.distance_metric not in {"cosine", "l2", "ip"}:
             raise ValueError("DISTANCE_METRIC 只支持 cosine、l2 或 ip")
         if self.llm_timeout <= 0:
