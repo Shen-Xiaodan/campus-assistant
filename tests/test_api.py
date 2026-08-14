@@ -60,3 +60,22 @@ def test_chat_api_passes_recent_history_to_service():
     with TestClient(create_app(service=HistoryService())) as client:
         response = client.post("/chat", json=payload)
     assert response.status_code == 200
+
+
+def test_chat_api_returns_clarification_fields_when_needed():
+    class ClarificationService:
+        def ask(self, question, history):
+            return ChatResponse(
+                answer="我找到了两个版本，你想看哪一版？",
+                sources=[],
+                grounded=False,
+                needs_clarification=True,
+                clarification_options=["适用于2023至24年度入学学生", "适用于2024至25年度入学学生"],
+            )
+
+    with TestClient(create_app(service=ClarificationService())) as client:
+        response = client.post("/chat", json={"question": "金融学需要多少学分？"})
+
+    assert response.status_code == 200
+    assert response.json()["needs_clarification"] is True
+    assert len(response.json()["clarification_options"]) == 2

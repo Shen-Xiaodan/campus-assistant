@@ -39,6 +39,7 @@ COPY = {
         "not_ready": "知识库尚未就绪",
         "unavailable": "问答服务已连接，但暂不可用：{detail}",
         "connection_error": "无法连接问答服务，请确认 API 已启动且索引已建立。",
+        "selected_version": "已选择：{option}",
     },
     "en": {
         "switch": "中文",
@@ -80,6 +81,7 @@ original links** for you to verify.""",
         "not_ready": "The knowledge base is not ready",
         "unavailable": "The service is connected but temporarily unavailable: {detail}",
         "connection_error": "Unable to reach the service. Check that the API is running and the index is available.",
+        "selected_version": "Selected: {option}",
     },
 }
 
@@ -447,11 +449,27 @@ if not st.session_state.messages:
     with st.chat_message("assistant"):
         st.markdown(copy["welcome"])
 
-for message in st.session_state.messages:
+selected_clarification = None
+for message_index, message in enumerate(st.session_state.messages):
     with st.chat_message(message["role"]):
         st.markdown(message["content"])
-        if message.get("grounded") is False:
+        if message.get("grounded") is False and not message.get("needs_clarification"):
             st.info(copy["insufficient"])
+        if message.get("needs_clarification"):
+            if message.get("clarification_resolved"):
+                st.caption(copy["selected_version"].format(option=message["clarification_resolved"]))
+            else:
+                options = message.get("clarification_options") or []
+                option_columns = st.columns(len(options))
+                for option_index, (column, option) in enumerate(zip(option_columns, options, strict=True)):
+                    with column:
+                        if st.button(
+                            option,
+                            key=f"clarification_{message_index}_{option_index}",
+                            use_container_width=True,
+                        ):
+                            message["clarification_resolved"] = option
+                            selected_clarification = option
         for source in message.get("sources", []):
             render_source(source)
 
@@ -470,7 +488,7 @@ for index, (column, example) in enumerate(zip(example_columns, copy["examples"],
 # makes Python skip the widget whenever an example is clicked, which is why the
 # input used to disappear until the next browser refresh.
 typed_question = st.chat_input(copy["placeholder"])
-question = selected_example if selected_example is not None else typed_question
+question = selected_clarification or selected_example or typed_question
 
 if question:
     request_history = [
@@ -494,7 +512,7 @@ if question:
                 api_response.raise_for_status()
                 result = api_response.json()
             st.markdown(result["answer"])
-            if not result["grounded"]:
+            if not result["grounded"] and not result.get("needs_clarification"):
                 st.info(copy["insufficient"])
             for source in result["sources"]:
                 render_source(source)
