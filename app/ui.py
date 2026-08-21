@@ -450,8 +450,11 @@ if not st.session_state.messages:
         st.markdown(copy["welcome"])
 
 selected_clarification = None
+selected_scope = None
 for message_index, message in enumerate(st.session_state.messages):
     with st.chat_message(message["role"]):
+        if message.get("scope_notice"):
+            st.caption(f'◌ {message["scope_notice"]}')
         st.markdown(message["content"])
         if message.get("grounded") is False and not message.get("needs_clarification"):
             st.info(copy["insufficient"])
@@ -470,6 +473,23 @@ for message_index, message in enumerate(st.session_state.messages):
                         ):
                             message["clarification_resolved"] = option
                             selected_clarification = option
+        if message.get("scope_options"):
+            if message.get("scope_resolved"):
+                st.caption(copy["selected_version"].format(option=message["scope_resolved"]))
+            else:
+                scope_options = message.get("scope_options") or []
+                scope_columns = st.columns(len(scope_options))
+                for option_index, (column, option) in enumerate(
+                    zip(scope_columns, scope_options, strict=True)
+                ):
+                    with column:
+                        if st.button(
+                            option,
+                            key=f"scope_{message_index}_{option_index}",
+                            use_container_width=True,
+                        ):
+                            message["scope_resolved"] = option
+                            selected_scope = option
         for source in message.get("sources", []):
             render_source(source)
 
@@ -488,7 +508,7 @@ for index, (column, example) in enumerate(zip(example_columns, copy["examples"],
 # makes Python skip the widget whenever an example is clicked, which is why the
 # input used to disappear until the next browser refresh.
 typed_question = st.chat_input(copy["placeholder"])
-question = selected_clarification or selected_example or typed_question
+question = selected_scope or selected_clarification or selected_example or typed_question
 
 if question:
     request_history = [
@@ -511,6 +531,8 @@ if question:
                     raise RuntimeError(copy["unavailable"].format(detail=detail))
                 api_response.raise_for_status()
                 result = api_response.json()
+            if result.get("scope_notice"):
+                st.caption(f'◌ {result["scope_notice"]}')
             st.markdown(result["answer"])
             if not result["grounded"] and not result.get("needs_clarification"):
                 st.info(copy["insufficient"])

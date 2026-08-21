@@ -79,3 +79,22 @@ def test_chat_api_returns_clarification_fields_when_needed():
     assert response.status_code == 200
     assert response.json()["needs_clarification"] is True
     assert len(response.json()["clarification_options"]) == 2
+
+
+def test_chat_api_returns_answer_scope_when_available():
+    class ScopedService:
+        def ask(self, question, history):
+            return ChatResponse(
+                answer="需要修满 120 学分。",
+                sources=[],
+                grounded=True,
+                scope_notice="目前按适用于2024至25年度入学学生的金融学培养方案回答。",
+                scope_options=["适用于2023至24年度入学学生"],
+            )
+
+    with TestClient(create_app(service=ScopedService())) as client:
+        response = client.post("/chat", json={"question": "金融学需要多少学分？"})
+
+    assert response.status_code == 200
+    assert "2024至25" in response.json()["scope_notice"]
+    assert response.json()["scope_options"] == ["适用于2023至24年度入学学生"]
