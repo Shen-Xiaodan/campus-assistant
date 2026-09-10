@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 import re
 import unicodedata
 from collections import Counter, defaultdict
@@ -65,6 +66,10 @@ AGGREGATE_QUERY_PATTERNS: tuple[re.Pattern[str], ...] = (
 
 def normalize_search_text(text: str) -> str:
     normalized = unicodedata.normalize("NFKC", text).lower()
+    # Match course codes despite PDF extraction inserting spaces, e.g.
+    # ``MA T1001`` vs the user query ``MAT1001``.
+    normalized = re.sub(r"\b([a-z]{2,4})\s*t\s*(\d{4}[a-z]?)\b", r"\1t\2", normalized)
+    normalized = re.sub(r"\b([a-z]{2,4})\s+(\d{4}[a-z]?)\b", r"\1\2", normalized)
     return re.sub(r"\s+", " ", _T2S.convert(normalized)).strip()
 
 
@@ -274,6 +279,47 @@ class CampusRetriever:
         self.metadatas = list(raw.get("metadatas", []))
         self.bm25 = BM25Index(self.documents)
         self.reranker = reranker
+        catalog_path = settings.data_dir / "course_catalog.json"
+        try:
+            self.course_catalog = json.loads(catalog_path.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError):
+            self.course_catalog = []
+
+    def _catalog_lookup(self, query: str) -> list[RetrievedEvidence]:
+        """Return exact course-code hits before approximate vector ranking."""
+        normalized = normalize_search_text(query).upper()
+        # ``\\b`` is unreliable next to Chinese characters because Python
+        # treats them as word characters; use ASCII-aware lookarounds.
+        codes = set(re.findall(r"(?<![A-Z0-9])[A-Z]{2,4}\d{4}[A-Z]?(?![A-Z0-9])", normalized))
+        if not codes:
+            return []
+        results: list[RetrievedEvidence] = []
+        seen: set[tuple[str, str, str]] = set()
+        for record in self.course_catalog:
+            if record.get("course_code") not in codes:
+                continue
+            excerpt = str(record.get("excerpt", "")).strip()
+            # Ignore code-only requirement lists when a titled course row is
+            # available elsewhere in the catalogue.
+            if (
+                len(re.sub(r"[^A-Za-z\u4e00-\u9fff]", "", excerpt)) <= len(record["course_code"])
+                or not re.search(r"\s\d+(?:\.\d+)?$", excerpt)
+            ):
+                continue
+            key = (record["course_code"], record.get("source_document", ""), excerpt)
+            if key in seen:
+                continue
+            seen.add(key)
+            results.append(
+                RetrievedEvidence(
+                    text=excerpt,
+                    document=record["source_document"],
+                    page=int(record["page"]),
+                    score=1.0,
+                    metadata={"source_type": "course_catalog", "page": int(record["page"])},
+                )
+            )
+        return results[: self.settings.top_k]
 
     @staticmethod
     def _evidence(document: Any, score: float) -> RetrievedEvidence:
@@ -288,6 +334,9 @@ class CampusRetriever:
         )
 
     def retrieve(self, query: str) -> list[RetrievedEvidence]:
+        catalog_hits = self._catalog_lookup(query)
+        if catalog_hits:
+            return catalog_hits
         aggregate_query = is_aggregate_query(query)
         fetch_k = self.settings.aggregate_fetch_k if aggregate_query else self.settings.fetch_k
         top_k = self.settings.aggregate_top_k if aggregate_query else self.settings.top_k

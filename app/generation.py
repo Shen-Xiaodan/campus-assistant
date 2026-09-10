@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import re
 from typing import Any, Protocol
 
 import requests
@@ -160,7 +161,21 @@ class AnswerGenerator:
         refusal = REFUSAL_ANSWER_EN if detect_language(question) == "en" else REFUSAL_ANSWER
         if not evidence:
             return ChatResponse(answer=refusal, sources=[], grounded=False)
-        text = _content(self._get_model().invoke(build_prompt(question, evidence, history)))
+        # Course-code lookups are deterministic. Do not ask the LLM to infer
+        # whether a bare code such as ``CSC3160`` is a question; return the
+        # extracted catalogue row directly and preserve its citation.
+        catalog_evidence = [item for item in evidence if item.metadata.get("source_type") == "course_catalog"]
+        code_match = re.search(r"(?<![A-Za-z0-9])([A-Za-z]{2,4}\d{4}[A-Za-z]?)(?![A-Za-z0-9])", question)
+        if catalog_evidence and code_match:
+            code = code_match.group(1).upper()
+            details = catalog_evidence[0].text
+            details = re.sub(rf"^{re.escape(code)}\s*", "", details, flags=re.IGNORECASE).strip()
+            if detect_language(question) == "en":
+                text = f"{code} is {details} {citation_label(catalog_evidence[0].document, catalog_evidence[0].page)}"
+            else:
+                text = f"{code} 是 {details} {citation_label(catalog_evidence[0].document, catalog_evidence[0].page)}"
+        else:
+            text = _content(self._get_model().invoke(build_prompt(question, evidence, history)))
         if not text or text in {REFUSAL_ANSWER, REFUSAL_ANSWER_EN}:
             return ChatResponse(answer=refusal, sources=[], grounded=False)
         referenced = cited_evidence(text, evidence)

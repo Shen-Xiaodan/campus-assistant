@@ -3,9 +3,11 @@
 from __future__ import annotations
 
 import argparse
+import json
 from pathlib import Path
 
 from app.config import Settings
+from app.documents import extract_course_catalog
 from app.index import build_index
 from app.logging_config import configure_logging
 
@@ -18,10 +20,17 @@ def main() -> int:
     settings.validate()
     configure_logging(settings.log_level)
     report = build_index(settings, args.source.resolve() if args.source else None)
+    source_dir = args.source.resolve() if args.source else settings.data_dir
+    catalogue = extract_course_catalog(sorted(source_dir.rglob("*.pdf")))
+    catalogue_path = settings.data_dir / "course_catalog.json"
+    catalogue_path.write_text(
+        json.dumps(catalogue, ensure_ascii=False, indent=2), encoding="utf-8"
+    )
     print(f"新增/更新文档: {report.indexed_documents}")
     print(f"未变化跳过: {report.skipped_documents}")
     print(f"失败文档: {report.failed_documents}")
     print(f"新增文本块: {report.chunks_added}")
+    print(f"课程目录记录: {len(catalogue)}")
     for warning in report.warnings:
         print(f"提示: {warning}")
     return 1 if report.failed_documents else 0

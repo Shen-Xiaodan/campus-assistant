@@ -75,6 +75,9 @@ def index_configuration(settings: Settings) -> dict[str, Any]:
         "normalize_embeddings": True,
         "chunk_size": settings.chunk_size,
         "chunk_overlap": settings.chunk_overlap,
+        # Increment when PDF normalization changes so existing vectors are
+        # rebuilt and malformed course codes are corrected in-place.
+        "course_code_normalization_version": 1,
     }
 
 

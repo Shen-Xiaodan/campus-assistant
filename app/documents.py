@@ -40,9 +40,52 @@ def file_sha256(path: Path) -> str:
 
 def normalize_text(text: str) -> str:
     text = text.replace("\x00", " ").replace("\r\n", "\n").replace("\r", "\n")
+    # pypdf occasionally inserts a space between a course prefix and its
+    # number (for example ``MA T1001``). Keep the canonical code searchable.
+    text = re.sub(r"\b([A-Z]{2,4})\s+T\s*(\d{4}[A-Z]?)\b", r"\1T\2", text)
+    text = re.sub(r"\b([A-Z]{2,4})\s+(\d{4}[A-Z]?)\b", r"\1\2", text)
     text = re.sub(r"[ \t]+", " ", text)
     text = re.sub(r"\n{3,}", "\n\n", text)
     return text.strip()
+
+
+COURSE_CODE_RE = re.compile(r"\b([A-Z]{2,4}\d{4}[A-Z]?)\b")
+
+
+def extract_course_catalog(paths: list[Path]) -> list[dict[str, str]]:
+    """Extract a deduplicated, human-auditable course catalogue from study PDFs.
+
+    The source PDFs are still retained as the authority. This catalogue is a
+    convenience index: each record keeps the source document/page and a short
+    row excerpt so later exact course lookups do not depend on vector ranking.
+    """
+    records: dict[tuple[str, str, str], dict[str, str]] = {}
+    for path in paths:
+        if "study_schemes" not in path.parts:
+            continue
+        report = parse_pdf(path)
+        for page in report.pages:
+            text = page.text
+            for match in COURSE_CODE_RE.finditer(text):
+                code = match.group(1)
+                prefix = text[max(0, match.start() - 40) : match.start()]
+                if "course code" not in text.lower() and not re.search(r"\b(?:I{1,3}|II|III|IV)\.", prefix):
+                    continue
+                tail = text[match.end() : match.end() + 220]
+                # Stop at the next course code; retain English/Chinese title
+                # and the units when they are present in the same extraction.
+                next_code = COURSE_CODE_RE.search(tail)
+                if next_code:
+                    tail = tail[: next_code.start()]
+                excerpt = re.sub(r"\s+", " ", f"{code} {tail}").strip(" ,;:")
+                key = (code, excerpt, path.name)
+                records[key] = {
+                    "course_code": code,
+                    "source_document": path.name,
+                    "page": str(page.page),
+                    "excerpt": excerpt,
+                }
+    return sorted(records.values(), key=lambda item: (item["course_code"], item["source_document"], item["page"]))
 
 
 def parse_pdf(path: Path) -> ParseReport:

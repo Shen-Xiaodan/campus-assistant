@@ -136,10 +136,23 @@ def parse_documents(html: str, base_url: str) -> tuple[str, list[tuple[str, str]
 
 def applies_to_year(title: str, admission_year: int) -> bool:
     """Return whether a Chinese study-scheme title covers the admission year."""
-    starts = [int(value) for value in re.findall(r"(20\d{2})\s*至\s*\d{2}", title)]
+    # The Registry uses several equivalent formats, including ``2023至24``,
+    # ``2023-24``, ``2022-23 and thereafter`` and ``2020至21年度至2024至25``.
+    # The last form covers every cohort from 2020 through 2024.
+    normalized = _clean_text(title).lower()
+    continuous_range = re.search(
+        r"(?P<start>20\d{2})\s*(?:至|-)\s*(?:20)?\d{2}\s*年度?\s*"
+        r"(?:至|to)\s*(?P<end>20\d{2})\s*(?:至|-)\s*(?:20)?\d{2}",
+        normalized,
+    )
+    if continuous_range and int(continuous_range["start"]) <= admission_year <= int(continuous_range["end"]):
+        return True
+
+    starts = [int(value) for value in re.findall(r"(20\d{2})\s*(?:至|-)\s*(?:20)?\d{2}", normalized)]
     if admission_year in starts:
         return True
-    return bool(starts and ("及以后" in title or "或以后" in title) and admission_year >= starts[-1])
+    thereafter = any(marker in normalized for marker in ("及以后", "或以后", "之后", "thereafter"))
+    return bool(starts and thereafter and admission_year >= starts[-1])
 
 
 def choose_document(documents: list[tuple[str, str]], admission_year: int) -> tuple[str, str] | None:

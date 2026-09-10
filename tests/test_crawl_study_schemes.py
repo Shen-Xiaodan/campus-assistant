@@ -5,6 +5,9 @@ def test_applies_to_admission_year() -> None:
     assert applies_to_year("经济学_适用于2023至24年度入学学生.pdf", 2023)
     assert applies_to_year("临床医学_适用于2023至24年度及以后入学学生.pdf", 2025)
     assert applies_to_year("专业_适用于2021至22及2022至23年度入学学生.pdf", 2022)
+    assert applies_to_year("材料科学与工程_适用于2023-24年度入学学生.pdf", 2023)
+    assert applies_to_year("翻译_适用于2022至23年度及之后入学学生.pdf", 2023)
+    assert applies_to_year("应用心理学_适用于2020至21年度至2024至25年度入学学生.pdf", 2023)
     assert not applies_to_year("专业_适用于2024至25年度入学学生.pdf", 2023)
 
 

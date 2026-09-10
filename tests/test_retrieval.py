@@ -59,6 +59,11 @@ def test_search_text_normalizes_traditional_chinese():
     assert normalize_search_text("電子遊戲設計與開發") == "电子游戏设计与开发"
 
 
+def test_search_text_normalizes_split_course_codes():
+    assert normalize_search_text("MA T1001") == "mat1001"
+    assert normalize_search_text("MAT1001") == "mat1001"
+
+
 def test_query_expansion_adds_chinese_english_course_aliases():
     game_variants = expand_query("有没有游戏制作课程")
     bio_variants = expand_query("bio相关课程")
