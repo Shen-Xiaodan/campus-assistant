@@ -50,6 +50,8 @@ class ChatResponse(BaseModel):
     answer: str
     sources: list[SourceResponse]
     grounded: bool
+    answer_mode: str | None = None
+    disclaimer: str | None = None
     needs_clarification: bool | None = None
     clarification_options: list[str] | None = None
     scope_notice: str | None = None

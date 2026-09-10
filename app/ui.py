@@ -456,6 +456,8 @@ for message_index, message in enumerate(st.session_state.messages):
         if message.get("scope_notice"):
             st.caption(f'◌ {message["scope_notice"]}')
         st.markdown(message["content"])
+        if message.get("disclaimer"):
+            st.caption(message["disclaimer"])
         if message.get("grounded") is False and not message.get("needs_clarification"):
             st.info(copy["insufficient"])
         if message.get("needs_clarification"):
@@ -534,7 +536,13 @@ if question:
             if result.get("scope_notice"):
                 st.caption(f'◌ {result["scope_notice"]}')
             st.markdown(result["answer"])
-            if not result["grounded"] and not result.get("needs_clarification"):
+            if result.get("disclaimer"):
+                st.caption(result["disclaimer"])
+            if (
+                not result["grounded"]
+                and result.get("answer_mode", "official_fact") == "official_fact"
+                and not result.get("needs_clarification")
+            ):
                 st.info(copy["insufficient"])
             for source in result["sources"]:
                 render_source(source)

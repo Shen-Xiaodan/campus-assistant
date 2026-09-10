@@ -85,6 +85,35 @@ def test_scope_notice_is_skipped_when_question_has_year():
     assert answer_scope("2024至25年度金融学需要多少学分？", evidence) is None
 
 
+def test_course_explanation_does_not_scope_shared_course_to_first_programme():
+    class SharedCourseRetriever:
+        def retrieve(self, query):
+            return [
+                RetrievedEvidence(
+                    "CSC1001 Introduction to Computer Science: Programming Methodology 3",
+                    "化学_适用于2023至24年度入学学生.pdf",
+                    5,
+                    1.0,
+                    {"source_type": "course_catalog"},
+                ),
+                RetrievedEvidence(
+                    "CSC1001 Introduction to Computer Science: Programming Methodology 3",
+                    "数学与应用数学_适用于2023至24年度入学学生.pdf",
+                    9,
+                    0.99,
+                    {"source_type": "course_catalog"},
+                ),
+            ]
+
+    class ExplanationGenerator:
+        def answer(self, question, evidence, history):
+            assert len(evidence) == 2
+            return ChatResponse(answer="介绍内容", sources=[], grounded=True, answer_mode="course_explanation")
+
+    result = QAService(SharedCourseRetriever(), ExplanationGenerator()).ask("介绍一下 CSC1001")
+    assert result.scope_notice is None
+
+
 def test_english_scope_options_do_not_expose_raw_chinese_filename_phrase():
     assert applicability_option("2024至25年度入学学生", "en") == "For 2024–25 academic year entrants"
 

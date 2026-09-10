@@ -6,7 +6,7 @@ import re
 from collections import defaultdict
 from typing import Protocol
 
-from app.generation import AnswerGenerator
+from app.generation import OFFICIAL_FACT, AnswerGenerator, classify_query
 from app.language import detect_language
 from app.models import ChatHistoryMessage, ChatResponse, RetrievedEvidence
 
@@ -112,7 +112,10 @@ class QAService:
         retrieval_query = "\n相关上文：".join([*previous_user_questions[-2:], clean_question])
         evidence = self.retriever.retrieve(retrieval_query)
         retrieved_evidence = evidence
-        scope = answer_scope(clean_question, evidence)
+        # A course explanation/plan is not tied to the first programme that
+        # happens to mention a shared course. Version scoping is required only
+        # for official facts such as credits or graduation requirements.
+        scope = answer_scope(clean_question, evidence) if classify_query(clean_question) == OFFICIAL_FACT else None
         if scope:
             evidence, notice, options = scope
             response = self.generator.answer(clean_question, evidence, recent_history)

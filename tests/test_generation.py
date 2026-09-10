@@ -6,6 +6,7 @@ from app.generation import (
     OpenAICompatibleChatModel,
     citation_label,
     cited_evidence,
+    classify_query,
 )
 from app.models import ChatHistoryMessage, RetrievedEvidence
 
@@ -19,6 +20,31 @@ class FakeModel:
 def test_citation_format():
     assert citation_label("学生手册.pdf", 12) == "【学生手册.pdf，第 12 页】"
     assert citation_label("图书馆官网", None, "开放时间") == "【图书馆官网，开放时间】"
+
+
+def test_query_modes_separate_facts_explanations_and_plans():
+    assert classify_query("CSC1001多少学分") == "official_fact"
+    assert classify_query("介绍一下 CSC1001") == "course_explanation"
+    assert classify_query("给我 CSC1001 的学习路线") == "learning_plan"
+
+
+def test_course_explanation_does_not_use_identity_shortcut():
+    class ExplanationModel:
+        def invoke(self, prompt: str) -> str:
+            assert "课程介绍问题" in prompt
+            return "通用介绍：这是一门编程基础课。"
+
+    item = RetrievedEvidence(
+        "CSC1001 Introduction to Computer Science: Programming Methodology 3",
+        "化学培养方案.pdf",
+        5,
+        1.0,
+        {"source_type": "course_catalog"},
+    )
+    result = AnswerGenerator(Settings(), model=ExplanationModel()).answer("介绍一下 CSC1001", [item])
+    assert result.answer.startswith("通用介绍")
+    assert result.answer_mode == "course_explanation"
+    assert result.disclaimer
 
 
 def test_prompt_is_friendly_and_includes_recent_conversation():
