@@ -386,6 +386,21 @@ st.markdown(
     unsafe_allow_html=True,
 )
 
+if st.session_state.get("graduation_report"):
+    report = st.session_state.graduation_report
+    st.subheader("毕业要求检查报告")
+    credits = report.get("credits", {})
+    st.metric("已获得学分", f"{credits.get('earned', 0):g} / {credits.get('required', 0):g}")
+    st.write(f"当前状态：{report.get('overall_status', 'manual_review_required')}")
+    for group in report.get("requirement_groups", []):
+        with st.expander(group.get("name", group.get("id", "要求"))):
+            st.write(f"已完成：{', '.join(group.get('completed_courses', [])) or '无'}")
+            st.write(f"在修：{', '.join(group.get('in_progress_courses', [])) or '无'}")
+            st.write(f"缺少：{', '.join(group.get('missing_courses', [])) or '无'}")
+    if report.get("manual_review_items"):
+        st.warning("以下项目需要人工核验：" + "；".join(report["manual_review_items"]))
+    st.caption(report.get("disclaimer", "结果仅供规划参考，以教务处最终审核为准。"))
+
 if "messages" not in st.session_state:
     st.session_state.messages = []
 if "ui_language" not in st.session_state:
@@ -419,6 +434,46 @@ with st.sidebar:
     if st.button(copy["switch"], key="language_switch", use_container_width=True):
         st.session_state.ui_language = "en" if language == "zh" else "zh"
         st.rerun()
+    st.markdown("### 毕业要求检查")
+    st.caption("上传成绩单后，系统会临时解析并按培养方案核对；文件不会加入知识库。")
+    transcript_file = st.file_uploader("上传成绩单 PDF", type=["pdf"], key="transcript_upload")
+    if transcript_file and st.button("解析成绩单", use_container_width=True):
+        try:
+            response = requests.post(
+                f"{API_URL}/transcripts/parse",
+                files={"upload": (transcript_file.name, transcript_file.getvalue(), "application/pdf")},
+                timeout=60,
+            )
+            response.raise_for_status()
+            st.session_state.transcript_parse = response.json()
+        except (requests.RequestException, ValueError) as exc:
+            st.error(f"成绩单解析失败：{exc}")
+    parsed = st.session_state.get("transcript_parse")
+    if parsed:
+        programme = st.text_input("专业（请确认）", value=parsed.get("programme") or "", key="transcript_programme")
+        admission_year = st.number_input(
+            "入学年份（请确认）",
+            min_value=2000,
+            max_value=2100,
+            value=parsed.get("admission_year") or 2023,
+            key="transcript_year",
+        )
+        if st.button("生成毕业要求报告", use_container_width=True):
+            try:
+                response = requests.post(
+                    f"{API_URL}/graduation/check",
+                    json={
+                        "analysis_id": parsed["analysis_id"],
+                        "programme": programme,
+                        "admission_year": admission_year,
+                    },
+                    timeout=60,
+                )
+                response.raise_for_status()
+                st.session_state.graduation_report = response.json()
+            except (requests.RequestException, ValueError) as exc:
+                st.error(f"报告生成失败：{exc}")
+    st.divider()
     st.markdown(
         f"""
         <section class="sidebar-brand">
