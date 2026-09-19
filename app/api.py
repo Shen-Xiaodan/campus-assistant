@@ -27,6 +27,12 @@ from app.transcript import TranscriptRecord, check_graduation, parse_transcript_
 logger = logging.getLogger(__name__)
 
 
+def _programme_matches(value: str, rules: dict[str, Any]) -> bool:
+    normalized = " ".join(value.casefold().split())
+    accepted = [rules.get("programme", ""), *rules.get("programme_aliases", [])]
+    return normalized in {" ".join(str(option).casefold().split()) for option in accepted if option}
+
+
 def build_service(settings: Settings) -> QAService:
     manifest = settings.index_dir / MANIFEST_NAME
     if not manifest.exists():
@@ -115,12 +121,14 @@ def create_app(settings: Settings | None = None, service: Any | None = None) -> 
         rules = json.loads(rules_path.read_text(encoding="utf-8"))
         year_start = rules.get("admission_year_start", 0)
         year_end = rules.get("admission_year_end", 9999)
-        if rules.get("programme") != programme or not (year_start <= int(admission_year) <= year_end):
+        if not _programme_matches(str(programme), rules) or not (year_start <= int(admission_year) <= year_end):
             raise HTTPException(status_code=422, detail="没有找到该专业和入学年份对应的修读计划")
+        canonical_programme = rules["programme"]
         report = check_graduation(TranscriptRecord(**raw), rules)
         return {
             "analysis_id": analysis_id,
-            "programme": programme,
+            "programme": canonical_programme,
+            "detected_programme": raw.get("programme"),
             "admission_year": admission_year,
             "scheme": rules,
             **report,

@@ -192,5 +192,7 @@ data/**/*.pdf
 # Ignore config.json to prevent sensitive data exposure
 config.json
 project_documentation.md
+# Local project modification manual
+docs/CHANGELOG.md
 vector_db_dir/*
 !vector_db_dir/information.md

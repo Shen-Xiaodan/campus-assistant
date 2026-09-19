@@ -48,6 +48,9 @@ COPY = {
         "parsing": "正在读取成绩单，请稍候……",
         "parsed_summary": "解析摘要",
         "course_count": "识别课程数",
+        "parsed_completed": "已完成课程",
+        "parsed_in_progress": "在修课程",
+        "parsed_credits": "已识别完成学分",
         "confirm_programme": "专业（请确认）",
         "confirm_year": "入学年份（请确认）",
         "check_report": "生成匹配报告",
@@ -59,6 +62,7 @@ COPY = {
         "file_too_large": "文件超过 10 MB，请选择较小的 PDF。",
         "choose_hint": "请选择 PDF 文件后继续。",
         "course_details": "查看识别到的课程",
+        "term": "学期",
         "current_status": "当前状态",
         "credits_progress": "已获得学分 / 要求",
         "completed_courses": "已完成",
@@ -119,6 +123,9 @@ original links** for you to verify.""",
         "parsing": "Reading your transcript…",
         "parsed_summary": "Parsing summary",
         "course_count": "Courses detected",
+        "parsed_completed": "Completed courses",
+        "parsed_in_progress": "Courses in progress",
+        "parsed_credits": "Detected completed credits",
         "confirm_programme": "Programme (confirm)",
         "confirm_year": "Admission year (confirm)",
         "check_report": "Generate matching report",
@@ -130,6 +137,7 @@ original links** for you to verify.""",
         "file_too_large": "The file exceeds 10 MB. Please choose a smaller PDF.",
         "choose_hint": "Choose a PDF file to continue.",
         "course_details": "View detected courses",
+        "term": "Term",
         "current_status": "Current status",
         "credits_progress": "Earned / required credits",
         "completed_courses": "Completed",
@@ -546,24 +554,31 @@ def transcript_dialog() -> None:
         parsed = st.session_state.transcript_parse
         st.subheader(copy["parsed_summary"])
         st.write(f"{copy['course_count']}：{len(parsed.get('courses', []))}")
+        completed_courses = [course for course in parsed.get("courses", []) if course.get("status") == "passed"]
+        in_progress_courses = [
+            course for course in parsed.get("courses", []) if course.get("status") == "in_progress"
+        ]
+        completed_credits = sum(course.get("credits") or 0 for course in completed_courses)
+        summary_columns = st.columns(3)
+        summary_columns[0].metric(copy["parsed_completed"], len(completed_courses))
+        summary_columns[1].metric(copy["parsed_in_progress"], len(in_progress_courses))
+        summary_columns[2].metric(copy["parsed_credits"], f"{completed_credits:g}")
         if parsed.get("warnings"):
             st.warning("；".join(parsed["warnings"]))
         if parsed.get("courses"):
             with st.expander(copy["course_details"]):
-                st.dataframe(
-                    [
-                        {
-                            "Code": course.get("course_code"),
-                            "Name": course.get("course_name"),
-                            "Credits": course.get("credits"),
-                            "Grade": course.get("grade"),
-                            "Status": course.get("status"),
-                        }
-                        for course in parsed["courses"]
-                    ],
-                    use_container_width=True,
-                    hide_index=True,
-                )
+                for course in parsed["courses"]:
+                    code = course.get("course_code") or "—"
+                    name = course.get("course_name") or "—"
+                    credits = course.get("credits")
+                    grade = course.get("grade") or "—"
+                    status = course.get("status") or "unknown"
+                    term = course.get("term") or "—"
+                    credit_text = f"{credits:g}" if isinstance(credits, int | float) else "—"
+                    st.text(f"{code} · {name}")
+                    st.caption(
+                        f"{copy['term']}: {term} · Credits: {credit_text} · Grade: {grade} · Status: {status}"
+                    )
         programme = st.text_input(
             copy["confirm_programme"], value=parsed.get("programme") or "", key="transcript_programme"
         )

@@ -30,9 +30,28 @@ class TranscriptRecord(BaseModel):
     warnings: list[str] = Field(default_factory=list)
 
 
-_CODE = re.compile(r"(?<![A-Za-z0-9])([A-Za-z]{2,4})\s*[- ]?\s*(\d{4}[A-Za-z]?)(?![A-Za-z0-9])")
-_CREDITS = re.compile(r"(?<!\d)(\d+(?:\.\d+)?)\s*(?:学分|credits?|units?)\b", re.I)
-_YEAR = re.compile(r"20\d{2}")
+_COURSE_CODE = r"[A-Z]{2,4}\s*[- ]?\s*\d{4}[A-Z]?"
+_GRADE = r"A\+|A-|A|B\+|B-|B|C\+|C-|C|D\+|D-|D|PA|DI|IP|WD|W|P|F|U"
+_COURSE_ROW = re.compile(
+    rf"^\s*(?P<code>{_COURSE_CODE})\s+"
+    rf"(?P<title>.+?)\s+"
+    rf"(?P<credits>\d+(?:\.\d+)?)\s+"
+    rf"(?P<grade>{_GRADE})\s+"
+    r"(?P<percentage>N/?A|\d+(?:\.\d+)?)\s*$",
+    re.I,
+)
+_COURSE_START = re.compile(rf"^\s*(?P<code>{_COURSE_CODE})\b", re.I)
+_TERM = re.compile(r"^\s*(20\d{2}[-–—]\d{2})\s+Term\s+([12])\s*$", re.I)
+_PROGRAMME = re.compile(
+    r"^\s*(?:Major\s*/\s*Programme|Programme|Major|专业)\s*[:：]\s*(.+?)\s*$",
+    re.I | re.M,
+)
+_ADMISSION_YEAR = re.compile(
+    r"^\s*(?:Admitted\s+in|Admission\s+Year|Entry\s+Year|入学年份|入学年度)\s*[:：]\s*"
+    r"(?:[A-Za-z]+\s+)?(20\d{2})\s*$",
+    re.I | re.M,
+)
+_TOTAL_UNITS = re.compile(r"(?:Cumulative\s+Units\s+Passed|累计已获学分)\s*=\s*(\d+(?:\.\d+)?)", re.I)
 
 
 def _status(grade: str | None) -> str:
@@ -45,9 +64,126 @@ def _status(grade: str | None) -> str:
         return "in_progress"
     if value in {"F", "FA", "U", "不及格", "FAIL"}:
         return "failed"
-    if value in {"A", "A-", "A+", "B", "B-", "B+", "C", "C-", "C+", "D", "D-", "D+", "P", "PASS", "及格"}:
+    if value in {
+        "A", "A-", "A+", "B", "B-", "B+", "C", "C-", "C+", "D", "D-", "D+",
+        "P", "PA", "DI", "PASS", "及格",
+    }:
         return "passed"
     return "unknown"
+
+
+def _is_course_header(line: str) -> bool:
+    value = line.casefold()
+    return all(label in value for label in ("course code", "course title", "units", "grade"))
+
+
+def _is_course_table_end(line: str) -> bool:
+    value = line.strip().casefold()
+    return value.startswith(
+        (
+            "units passed",
+            "cumulative units passed",
+            "honour(s)/award(s)",
+            "summary",
+            "remarks",
+            "invalid unless",
+            "end of transcript",
+        )
+    ) or value.startswith("*")
+
+
+def _is_title_continuation(raw_line: str, line: str) -> bool:
+    indentation = len(raw_line) - len(raw_line.lstrip())
+    return indentation >= 4 and "=" not in line and not _TERM.match(line) and not _is_course_header(line)
+
+
+def parse_transcript_pages(page_texts: list[str]) -> TranscriptRecord:
+    """Parse layout-preserving transcript page text into a normalized record."""
+    courses: list[TranscriptCourse] = []
+    warnings: list[str] = []
+    programme = None
+    admission_year = None
+    total_credits: list[float] = []
+    nonempty_pages = [index for index, text in enumerate(page_texts, start=1) if text.strip()]
+    last_nonempty_page = max(nonempty_pages, default=0)
+    all_pages_empty = not nonempty_pages
+
+    for page_number, raw_text in enumerate(page_texts, start=1):
+        text = raw_text.replace("\x00", " ").replace("\r\n", "\n").replace("\r", "\n")
+        if not text.strip():
+            if all_pages_empty or page_number <= last_nonempty_page:
+                warnings.append(f"第 {page_number} 页没有文本，可能需要 OCR")
+            continue
+        if programme is None:
+            match = _PROGRAMME.search(text)
+            if match:
+                programme = match.group(1).strip()
+        if admission_year is None:
+            match = _ADMISSION_YEAR.search(text)
+            if match:
+                admission_year = int(match.group(1))
+
+        total_credits.extend(float(value) for value in _TOTAL_UNITS.findall(text))
+        current_term = None
+        inside_course_table = False
+        last_course: TranscriptCourse | None = None
+        for raw_line in text.splitlines():
+            line = re.sub(r"[ \t]+", " ", raw_line).strip()
+            if not line:
+                continue
+            term_match = _TERM.match(line)
+            if term_match:
+                current_term = f"{term_match.group(1).replace('–', '-').replace('—', '-')} Term {term_match.group(2)}"
+                inside_course_table = False
+                last_course = None
+                continue
+            if _is_course_header(line):
+                inside_course_table = True
+                last_course = None
+                continue
+            if not inside_course_table:
+                continue
+            if _is_course_table_end(line):
+                inside_course_table = False
+                last_course = None
+                continue
+
+            row_match = _COURSE_ROW.match(line)
+            if row_match:
+                grade = row_match.group("grade").upper()
+                course = TranscriptCourse(
+                    course_code=normalize_code(row_match.group("code")),
+                    course_name=row_match.group("title").strip(),
+                    credits=float(row_match.group("credits")),
+                    grade=grade,
+                    term=current_term,
+                    status=_status(grade),
+                    source_page=page_number,
+                    confidence=0.98,
+                )
+                courses.append(course)
+                last_course = course
+                continue
+            incomplete_match = _COURSE_START.match(line)
+            if incomplete_match:
+                warnings.append(
+                    f"第 {page_number} 页课程 {normalize_code(incomplete_match.group('code'))} 字段不完整，已跳过"
+                )
+                last_course = None
+                continue
+            if last_course is not None and _is_title_continuation(raw_line, line):
+                separator = "" if last_course.course_name and last_course.course_name.endswith(("-", "–", "—")) else " "
+                last_course.course_name = f"{last_course.course_name}{separator}{line}".strip()
+
+    if not courses:
+        warnings.append("未识别到课程记录，请确认 PDF 是电子成绩单或改用 OCR")
+    return TranscriptRecord(
+        programme=programme,
+        admission_year=admission_year,
+        courses=courses,
+        total_credits_reported=max(total_credits, default=None),
+        warnings=warnings,
+    )
 
 
 def parse_transcript_pdf(path: Path) -> TranscriptRecord:
@@ -57,51 +193,13 @@ def parse_transcript_pdf(path: Path) -> TranscriptRecord:
     except ImportError as exc:  # pragma: no cover
         raise RuntimeError("缺少 pypdf，无法解析成绩单") from exc
     reader = PdfReader(str(path))
-    courses: list[TranscriptCourse] = []
-    warnings: list[str] = []
-    programme = None
-    admission_year = None
-    for page_number, page in enumerate(reader.pages, start=1):
-        text = normalize_text(page.extract_text() or "")
-        if not text:
-            warnings.append(f"第 {page_number} 页没有文本，可能需要 OCR")
-            continue
-        if programme is None:
-            match = re.search(r"(?:Programme|专业|课程|Major)\s*(?:Title|名称)?\s*[:：]?\s*([^\n]+)", text, re.I)
-            if match:
-                programme = match.group(1).strip()
-        if admission_year is None:
-            match = re.search(r"(?:入学年份|入学年度|admission year|entry year)\s*[:：]?\s*(20\d{2})", text, re.I)
-            if match:
-                admission_year = int(match.group(1))
-        lines = [line.strip() for line in text.splitlines() if line.strip()]
-        for index, line in enumerate(lines):
-            code_match = _CODE.search(line)
-            if not code_match:
-                continue
-            code = f"{code_match.group(1)}{code_match.group(2)}".upper()
-            tail = line[code_match.end() :].strip(" -:|\t")
-            if not tail and index + 1 < len(lines):
-                tail = lines[index + 1]
-            credit_match = _CREDITS.search(line) or (_CREDITS.search(tail) if tail else None)
-            credits = float(credit_match.group(1)) if credit_match else None
-            grade_match = re.search(r"(?:grade|成绩|result)\s*[:：]?\s*([A-F][+-]?|P|F|IP|W|及格|不及格)", line, re.I)
-            grade = grade_match.group(1) if grade_match else None
-            courses.append(
-                TranscriptCourse(
-                    course_code=code,
-                    course_name=tail or None,
-                    credits=credits,
-                    grade=grade,
-                    term=None,
-                    status=_status(grade),
-                    source_page=page_number,
-                    confidence=0.75 if credits is not None else 0.55,
-                )
-            )
-    if not courses:
-        warnings.append("未识别到课程记录，请确认 PDF 是电子成绩单或改用 OCR")
-    return TranscriptRecord(programme=programme, admission_year=admission_year, courses=courses, warnings=warnings)
+    pages = []
+    for page in reader.pages:
+        try:
+            pages.append(page.extract_text(extraction_mode="layout") or "")
+        except (TypeError, ValueError):
+            pages.append(normalize_text(page.extract_text() or ""))
+    return parse_transcript_pages(pages)
 
 
 def normalize_code(value: str) -> str:
