@@ -437,6 +437,25 @@ st.markdown(
         .stAlert { border-radius: 2px; }
         .stAlert p { color: var(--ink); }
 
+        .model-status {
+            border-top: 1px solid var(--line);
+            color: var(--muted);
+            font-size: .72rem;
+            line-height: 1.7;
+            margin-top: 1.2rem;
+            padding-top: 1rem;
+        }
+
+        [data-testid="stSidebar"] [data-testid="stExpander"] {
+            background: rgba(255, 254, 250, .55);
+            margin-top: 1.6rem;
+        }
+
+        [data-testid="stSidebar"] .stButton > button {
+            border-color: var(--line);
+            border-radius: 3px;
+        }
+
         @media (max-width: 640px) {
             [data-testid="stAppViewContainer"] > .main .block-container {
                 padding-top: 2.2rem;
@@ -672,6 +691,9 @@ st.markdown(
     unsafe_allow_html=True,
 )
 
+if current_model_config() is None:
+    st.info("准备好后，请先在左侧填写你自己的模型 API。配置只用于当前会话，不会保存到项目中。")
+
 if not st.session_state.messages:
     with st.chat_message("assistant"):
         st.markdown(copy["welcome"])
@@ -740,6 +762,10 @@ typed_question = st.chat_input(copy["placeholder"])
 question = selected_scope or selected_clarification or selected_example or typed_question
 
 if question:
+    model_config = current_model_config()
+    if model_config is None:
+        st.info("开始提问前，请先在左侧配置你自己的模型服务。密钥仅用于当前会话中的模型请求。")
+        st.stop()
     request_history = [
         {"role": message["role"], "content": message["content"]}
         for message in st.session_state.messages[-6:]
@@ -752,7 +778,7 @@ if question:
             with st.spinner(copy["loading"]):
                 api_response = requests.post(
                     f"{API_URL}/chat",
-                    json={"question": question, "history": request_history},
+                    json={"question": question, "history": request_history, "model": model_config},
                     timeout=90,
                 )
                 if api_response.status_code == 503:
