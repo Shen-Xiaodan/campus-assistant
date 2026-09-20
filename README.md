@@ -137,7 +137,8 @@ uvicorn app.api:app --reload
 ```
 
 ```bash
-streamlit run app/ui.py
+source .venv/bin/activate
+streamlit run app/ui.pystreamlit run app/ui.py
 ```
 
 The default frontend is `http://localhost:8501`; API documentation is at `http://127.0.0.1:8000/docs`. Set `API_URL` to point the frontend to another API address.

@@ -16,10 +16,10 @@ from fastapi.responses import JSONResponse
 
 from app.config import Settings
 from app.exceptions import CampusAssistantError, IndexUnavailableError
-from app.generation import AnswerGenerator, check_model_connection
+from app.generation import AnswerGenerator
 from app.index import MANIFEST_NAME, open_vectorstore
 from app.logging_config import configure_logging
-from app.models import ChatRequest, ChatResponse, ModelCheckRequest, ModelCheckResponse
+from app.models import ChatRequest, ChatResponse
 from app.retrieval import CampusRetriever
 from app.service import QAService
 from app.transcript import TranscriptRecord, check_graduation, parse_transcript_pdf
@@ -152,7 +152,7 @@ def create_app(settings: Settings | None = None, service: Any | None = None) -> 
             raise HTTPException(status_code=503, detail=detail)
         started = time.perf_counter()
         try:
-            response = qa_service.ask(payload.question, payload.history, payload.model)
+            response = qa_service.ask(payload.question, payload.history)
         except CampusAssistantError:
             raise
         except Exception as exc:
@@ -165,11 +165,6 @@ def create_app(settings: Settings | None = None, service: Any | None = None) -> 
             len(response.sources),
         )
         return response
-
-    @app.post("/model/check", response_model=ModelCheckResponse)
-    async def check_model(payload: ModelCheckRequest) -> ModelCheckResponse:
-        check_model_connection(payload.model)
-        return ModelCheckResponse(connected=True, message="连接成功，模型已准备好")
 
     return app
 

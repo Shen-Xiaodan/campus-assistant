@@ -15,7 +15,7 @@ class RecordingGenerator:
     def __init__(self):
         self.history = []
 
-    def answer(self, question, evidence, history, connection=None):
+    def answer(self, question, evidence, history):
         self.history = history
         return ChatResponse(answer="暂未找到。", sources=[], grounded=False)
 

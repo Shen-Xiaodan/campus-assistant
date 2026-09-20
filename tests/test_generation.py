@@ -167,7 +167,7 @@ def test_openai_compatible_provider_request(monkeypatch):
     assert captured["timeout"] == 30
 
 
-def test_request_connection_overrides_shared_model(monkeypatch):
+def test_answer_generator_uses_model_from_settings(monkeypatch):
     captured = {}
 
     class FakeResponse:
@@ -182,18 +182,18 @@ def test_request_connection_overrides_shared_model(monkeypatch):
         return FakeResponse()
 
     monkeypatch.setattr("app.generation.requests.post", fake_post)
-    connection = ModelConnection(
-        api_key="user-secret",
-        base_url="https://api.example.com/v1",
-        model_id="user-model",
+    settings = Settings(
+        llm_provider="openai-compatible",
+        llm_api_key="env-secret",
+        llm_base_url="https://api.example.com/v1",
+        llm_model="env-model",
     )
     evidence = RetrievedEvidence("学生事务说明", "学生手册.pdf", 12, 0.9)
-    result = AnswerGenerator(Settings(), model=FakeModel()).answer("问题", [evidence], connection=connection)
+    result = AnswerGenerator(settings).answer("问题", [evidence])
 
     assert result.grounded is True
     assert captured == {
         "url": "https://api.example.com/v1/chat/completions",
-        "authorization": "Bearer user-secret",
-        "model": "user-model",
+        "authorization": "Bearer env-secret",
+        "model": "env-model",
     }
-    assert "user-secret" not in repr(connection)

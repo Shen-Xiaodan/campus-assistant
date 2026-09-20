@@ -109,7 +109,6 @@ class QAService:
         self,
         question: str,
         history: list[ChatHistoryMessage] | None = None,
-        connection: ModelConnection | None = None,
     ) -> ChatResponse:
         clean_question = question.strip()
         recent_history = (history or [])[-6:]
