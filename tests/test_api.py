@@ -98,3 +98,40 @@ def test_chat_api_returns_answer_scope_when_available():
     assert response.status_code == 200
     assert "2024至25" in response.json()["scope_notice"]
     assert response.json()["scope_options"] == ["适用于2023至24年度入学学生"]
+
+
+def test_graduation_report_endpoint_returns_json_without_native_table_conversion():
+    app = create_app(service=FakeService())
+    with TestClient(app) as client:
+        app.state.transcripts["test-analysis"] = {
+            "programme": "Computer Science and Engineering",
+            "admission_year": 2023,
+            "courses": [
+                {
+                    "course_code": "CSC1001",
+                    "course_name": "Introduction to Computer Science",
+                    "credits": 3,
+                    "grade": "A",
+                    "term": None,
+                    "status": "passed",
+                    "source_page": 1,
+                    "confidence": 0.9,
+                }
+            ],
+            "total_credits_reported": None,
+            "warnings": [],
+        }
+        response = client.post(
+            "/graduation/check",
+            json={
+                "analysis_id": "test-analysis",
+                "programme": "Computer Science and Engineering",
+                "admission_year": 2023,
+            },
+        )
+
+    assert response.status_code == 200
+    assert response.json()["programme"] == "计算机科学与技术"
+    assert response.json()["detected_programme"] == "Computer Science and Engineering"
+    assert response.json()["credits"] == {"earned": 3.0, "required": 70.0, "remaining": 67.0}
+    assert response.json()["overall_status"] == "partially_satisfied"

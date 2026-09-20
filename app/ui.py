@@ -40,6 +40,36 @@ COPY = {
         "unavailable": "问答服务已连接，但暂不可用：{detail}",
         "connection_error": "无法连接问答服务，请确认 API 已启动且索引已建立。",
         "selected_version": "已选择：{option}",
+        "transcript_title": "成绩单匹配",
+        "transcript_intro": "上传 PDF 成绩单，临时解析课程并按培养方案核对。文件不会加入知识库。",
+        "upload_transcript": "上传并解析成绩单",
+        "choose_file": "选择成绩单 PDF",
+        "start_parse": "开始解析",
+        "parsing": "正在读取成绩单，请稍候……",
+        "parsed_summary": "解析摘要",
+        "course_count": "识别课程数",
+        "parsed_completed": "已完成课程",
+        "parsed_in_progress": "在修课程",
+        "parsed_credits": "已识别完成学分",
+        "confirm_programme": "专业（请确认）",
+        "confirm_year": "入学年份（请确认）",
+        "check_report": "生成匹配报告",
+        "checking": "正在核对培养方案，请稍候……",
+        "reset_transcript": "重新上传",
+        "close": "关闭",
+        "parse_failed": "成绩单解析失败：{detail}",
+        "report_failed": "报告生成失败：{detail}",
+        "file_too_large": "文件超过 10 MB，请选择较小的 PDF。",
+        "choose_hint": "请选择 PDF 文件后继续。",
+        "course_details": "查看识别到的课程",
+        "term": "学期",
+        "current_status": "当前状态",
+        "credits_progress": "已获得学分 / 要求",
+        "completed_courses": "已完成",
+        "in_progress_courses": "在修",
+        "missing_courses": "缺少",
+        "none": "无",
+        "manual_review": "以下项目需要人工核验：",
     },
     "en": {
         "switch": "中文",
@@ -82,6 +112,39 @@ original links** for you to verify.""",
         "unavailable": "The service is connected but temporarily unavailable: {detail}",
         "connection_error": "Unable to reach the service. Check that the API is running and the index is available.",
         "selected_version": "Selected: {option}",
+        "transcript_title": "Transcript matching",
+        "transcript_intro": (
+            "Upload a PDF transcript to temporarily parse courses and check your study scheme. "
+            "The file is never added to the knowledge base."
+        ),
+        "upload_transcript": "Upload and parse transcript",
+        "choose_file": "Choose transcript PDF",
+        "start_parse": "Start parsing",
+        "parsing": "Reading your transcript…",
+        "parsed_summary": "Parsing summary",
+        "course_count": "Courses detected",
+        "parsed_completed": "Completed courses",
+        "parsed_in_progress": "Courses in progress",
+        "parsed_credits": "Detected completed credits",
+        "confirm_programme": "Programme (confirm)",
+        "confirm_year": "Admission year (confirm)",
+        "check_report": "Generate matching report",
+        "checking": "Checking your study scheme…",
+        "reset_transcript": "Upload another",
+        "close": "Close",
+        "parse_failed": "Transcript parsing failed: {detail}",
+        "report_failed": "Report generation failed: {detail}",
+        "file_too_large": "The file exceeds 10 MB. Please choose a smaller PDF.",
+        "choose_hint": "Choose a PDF file to continue.",
+        "course_details": "View detected courses",
+        "term": "Term",
+        "current_status": "Current status",
+        "credits_progress": "Earned / required credits",
+        "completed_courses": "Completed",
+        "in_progress_courses": "In progress",
+        "missing_courses": "Missing",
+        "none": "None",
+        "manual_review": "Manual review required: ",
     },
 }
 
@@ -149,11 +212,10 @@ st.markdown(
         }
 
         [data-testid="stSidebar"] .block-container {
-            padding: 3rem 1.6rem 2rem;
+            padding: 2rem 1.6rem 1.5rem;
         }
 
         .sidebar-brand {
-            min-height: calc(100vh - 7rem);
             display: flex;
             flex-direction: column;
         }
@@ -163,7 +225,7 @@ st.markdown(
             font-size: .61rem;
             font-weight: 600;
             letter-spacing: .2em;
-            margin-bottom: 1.8rem;
+            margin-bottom: 1rem;
             text-transform: uppercase;
         }
 
@@ -175,16 +237,16 @@ st.markdown(
             display: flex;
             font-family: "Playfair Display", serif;
             font-size: 1.1rem;
-            height: 2.7rem;
+            height: 2.35rem;
             justify-content: center;
-            margin-bottom: 1.4rem;
-            width: 2.7rem;
+            margin-bottom: 1rem;
+            width: 2.35rem;
         }
 
         .sidebar-name {
             color: var(--ink);
             font-family: "Songti SC", "Noto Sans SC", serif;
-            font-size: 2.35rem;
+            font-size: 2rem;
             font-weight: 600;
             letter-spacing: -.06em;
             line-height: 1.08;
@@ -203,14 +265,14 @@ st.markdown(
         .sidebar-rule {
             background: var(--line);
             height: 1px;
-            margin: 2rem 0 1.7rem;
+            margin: 1.25rem 0 1rem;
             width: 100%;
         }
 
         .sidebar-copy {
             color: var(--muted);
             font-size: .72rem;
-            line-height: 1.9;
+            line-height: 1.65;
             margin: 0;
         }
 
@@ -219,8 +281,8 @@ st.markdown(
             color: #8c9088;
             font-size: .58rem;
             letter-spacing: .14em;
-            margin-top: auto;
-            padding-top: 1.2rem;
+            margin-top: 1rem;
+            padding-top: .8rem;
             text-transform: uppercase;
         }
 
@@ -390,6 +452,10 @@ if "messages" not in st.session_state:
     st.session_state.messages = []
 if "ui_language" not in st.session_state:
     st.session_state.ui_language = "zh"
+if "transcript_state" not in st.session_state:
+    st.session_state.transcript_state = "idle"
+if "transcript_upload_nonce" not in st.session_state:
+    st.session_state.transcript_upload_nonce = 0
 
 language = st.session_state.ui_language
 copy = COPY[language]
@@ -415,10 +481,163 @@ def render_source(source: dict) -> None:
         if source.get("crawled_at"):
             st.caption(f'{copy["crawled"]}: {source["crawled_at"][:10]}')
 
+
+def _api_detail(response: requests.Response, fallback: str) -> str:
+    try:
+        return str(response.json().get("detail", fallback))
+    except ValueError:
+        return fallback
+
+
+def _clear_transcript() -> None:
+    analysis_id = st.session_state.get("transcript_parse", {}).get("analysis_id")
+    if analysis_id:
+        try:
+            requests.delete(f"{API_URL}/transcripts/{analysis_id}", timeout=10)
+        except requests.RequestException:
+            pass
+    for key in (
+        "transcript_file", "transcript_parse", "graduation_report", "transcript_programme",
+        "transcript_year", "transcript_error", "transcript_error_stage",
+    ):
+        st.session_state.pop(key, None)
+    st.session_state.transcript_upload_nonce += 1
+    st.session_state.transcript_state = "idle"
+
+
+@st.dialog("成绩单匹配 / Transcript matching")
+def transcript_dialog() -> None:
+    st.caption(copy["transcript_intro"])
+    state = st.session_state.transcript_state
+
+    if state in {"idle", "file_selected"}:
+        upload = st.file_uploader(
+            copy["choose_file"], type=["pdf"],
+            key=f"transcript_file_picker_{st.session_state.transcript_upload_nonce}",
+        )
+        if upload:
+            if upload.size > 10 * 1024 * 1024:
+                st.error(copy["file_too_large"])
+                st.session_state.transcript_file = None
+            else:
+                st.session_state.transcript_file = upload
+                st.session_state.transcript_state = "file_selected"
+        file = st.session_state.get("transcript_file")
+        if file:
+            st.caption(f"{file.name} · {file.size / 1024 / 1024:.2f} MB")
+            if st.button(copy["start_parse"], type="primary", use_container_width=True):
+                st.session_state.transcript_state = "parsing"
+                st.session_state.pop("transcript_error", None)
+                try:
+                    with st.spinner(copy["parsing"]):
+                        response = requests.post(
+                            f"{API_URL}/transcripts/parse",
+                            files={"upload": (file.name, file.getvalue(), "application/pdf")},
+                            timeout=60,
+                        )
+                        response.raise_for_status()
+                        st.session_state.transcript_parse = response.json()
+                    st.session_state.transcript_state = "parsed"
+                except (requests.RequestException, ValueError) as exc:
+                    detail = _api_detail(response, str(exc)) if "response" in locals() else str(exc)
+                    st.session_state.transcript_error = copy["parse_failed"].format(detail=detail)
+                    st.session_state.transcript_error_stage = "parse"
+                    st.session_state.transcript_state = "file_selected"
+                st.rerun(scope="fragment")
+        else:
+            st.info(copy["choose_hint"])
+
+    if st.session_state.get("transcript_error"):
+        st.error(st.session_state.transcript_error)
+
+    if st.session_state.transcript_state in {"parsed", "completed"}:
+        parsed = st.session_state.transcript_parse
+        st.subheader(copy["parsed_summary"])
+        st.write(f"{copy['course_count']}：{len(parsed.get('courses', []))}")
+        completed_courses = [course for course in parsed.get("courses", []) if course.get("status") == "passed"]
+        in_progress_courses = [
+            course for course in parsed.get("courses", []) if course.get("status") == "in_progress"
+        ]
+        completed_credits = sum(course.get("credits") or 0 for course in completed_courses)
+        summary_columns = st.columns(3)
+        summary_columns[0].metric(copy["parsed_completed"], len(completed_courses))
+        summary_columns[1].metric(copy["parsed_in_progress"], len(in_progress_courses))
+        summary_columns[2].metric(copy["parsed_credits"], f"{completed_credits:g}")
+        if parsed.get("warnings"):
+            st.warning("；".join(parsed["warnings"]))
+        if parsed.get("courses"):
+            with st.expander(copy["course_details"]):
+                for course in parsed["courses"]:
+                    code = course.get("course_code") or "—"
+                    name = course.get("course_name") or "—"
+                    credits = course.get("credits")
+                    grade = course.get("grade") or "—"
+                    status = course.get("status") or "unknown"
+                    term = course.get("term") or "—"
+                    credit_text = f"{credits:g}" if isinstance(credits, int | float) else "—"
+                    st.text(f"{code} · {name}")
+                    st.caption(
+                        f"{copy['term']}: {term} · Credits: {credit_text} · Grade: {grade} · Status: {status}"
+                    )
+        programme = st.text_input(
+            copy["confirm_programme"], value=parsed.get("programme") or "", key="transcript_programme"
+        )
+        admission_year = st.number_input(
+            copy["confirm_year"], min_value=2000, max_value=2100,
+            value=parsed.get("admission_year") or 2023, key="transcript_year"
+        )
+        if st.button(
+            copy["check_report"], type="primary", use_container_width=True,
+            disabled=not programme.strip(),
+        ):
+            st.session_state.transcript_state = "checking"
+            st.session_state.pop("transcript_error", None)
+            try:
+                with st.spinner(copy["checking"]):
+                    response = requests.post(
+                        f"{API_URL}/graduation/check",
+                        json={
+                            "analysis_id": parsed["analysis_id"],
+                            "programme": programme,
+                            "admission_year": admission_year,
+                        },
+                        timeout=60,
+                    )
+                    response.raise_for_status()
+                    st.session_state.graduation_report = response.json()
+                st.session_state.transcript_state = "completed"
+            except (requests.RequestException, ValueError) as exc:
+                detail = _api_detail(response, str(exc)) if "response" in locals() else str(exc)
+                st.session_state.transcript_error = copy["report_failed"].format(detail=detail)
+                st.session_state.transcript_error_stage = "report"
+                st.session_state.transcript_state = "parsed"
+            st.rerun(scope="fragment")
+
+    if st.session_state.transcript_state == "completed":
+        report = st.session_state.graduation_report
+        credits = report.get("credits", {})
+        st.metric(copy["credits_progress"], f"{credits.get('earned', 0):g} / {credits.get('required', 0):g}")
+        st.write(f"{copy['current_status']}：{report.get('overall_status', 'manual_review_required')}")
+        for group in report.get("requirement_groups", []):
+            with st.expander(group.get("name", group.get("id", "要求"))):
+                completed = ", ".join(group.get("completed_courses", [])) or copy["none"]
+                in_progress = ", ".join(group.get("in_progress_courses", [])) or copy["none"]
+                missing = ", ".join(group.get("missing_courses", [])) or copy["none"]
+                st.write(f"{copy['completed_courses']}：{completed}")
+                st.write(f"{copy['in_progress_courses']}：{in_progress}")
+                st.write(f"{copy['missing_courses']}：{missing}")
+        if report.get("manual_review_items"):
+            st.warning(copy["manual_review"] + "；".join(report["manual_review_items"]))
+        st.caption(report.get("disclaimer", "结果仅供规划参考，以教务处最终审核为准。"))
+
+    if (
+        st.session_state.transcript_state in {"file_selected", "parsed", "completed"}
+        and st.button(copy["reset_transcript"], use_container_width=True)
+    ):
+        _clear_transcript()
+        st.rerun(scope="fragment")
+
 with st.sidebar:
-    if st.button(copy["switch"], key="language_switch", use_container_width=True):
-        st.session_state.ui_language = "en" if language == "zh" else "zh"
-        st.rerun()
     st.markdown(
         f"""
         <section class="sidebar-brand">
@@ -427,11 +646,19 @@ with st.sidebar:
             <p class="sidebar-name">{copy["sidebar_name"]}</p>
             <div class="sidebar-rule"></div>
             <p class="sidebar-copy">{copy["sidebar_copy"]}</p>
-            <div class="sidebar-meta">Campus Knowledge Desk · 2026</div>
         </section>
         """,
         unsafe_allow_html=True,
     )
+    if st.button(copy["switch"], key="language_switch", use_container_width=True):
+        st.session_state.ui_language = "en" if language == "zh" else "zh"
+        st.rerun()
+    st.divider()
+    st.markdown(f"### {copy['transcript_title']}")
+    st.caption(copy["transcript_intro"])
+    if st.button(copy["upload_transcript"], type="primary", use_container_width=True):
+        transcript_dialog()
+    st.markdown('<div class="sidebar-meta">Campus Knowledge Desk · 2026</div>', unsafe_allow_html=True)
 
 st.markdown(
     f"""

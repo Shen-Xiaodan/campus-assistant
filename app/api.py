@@ -4,11 +4,14 @@ from __future__ import annotations
 
 import json
 import logging
+import tempfile
 import time
+import uuid
 from contextlib import asynccontextmanager
+from pathlib import Path
 from typing import Any
 
-from fastapi import FastAPI, HTTPException, Request
+from fastapi import FastAPI, File, HTTPException, Request, UploadFile
 from fastapi.responses import JSONResponse
 
 from app.config import Settings
@@ -19,8 +22,15 @@ from app.logging_config import configure_logging
 from app.models import ChatRequest, ChatResponse
 from app.retrieval import CampusRetriever
 from app.service import QAService
+from app.transcript import TranscriptRecord, check_graduation, parse_transcript_pdf
 
 logger = logging.getLogger(__name__)
+
+
+def _programme_matches(value: str, rules: dict[str, Any]) -> bool:
+    normalized = " ".join(value.casefold().split())
+    accepted = [rules.get("programme", ""), *rules.get("programme_aliases", [])]
+    return normalized in {" ".join(str(option).casefold().split()) for option in accepted if option}
 
 
 def build_service(settings: Settings) -> QAService:
@@ -44,6 +54,7 @@ def create_app(settings: Settings | None = None, service: Any | None = None) -> 
 
     @asynccontextmanager
     async def lifespan(app: FastAPI):
+        app.state.transcripts = {}
         if service is not None:
             app.state.qa_service = service
         else:
@@ -71,6 +82,63 @@ def create_app(settings: Settings | None = None, service: Any | None = None) -> 
     async def health(request: Request) -> dict[str, str]:
         ready = getattr(request.app.state, "qa_service", None) is not None
         return {"status": "ready" if ready else "degraded"}
+
+    @app.post("/transcripts/parse")
+    async def parse_transcript(request: Request, upload: UploadFile = File(...)) -> dict[str, Any]:  # noqa: B008
+        if upload.content_type not in {"application/pdf", "application/octet-stream"}:
+            raise HTTPException(status_code=415, detail="只支持 PDF 成绩单")
+        content = await upload.read(10 * 1024 * 1024 + 1)
+        if len(content) > 10 * 1024 * 1024 or not content.startswith(b"%PDF"):
+            raise HTTPException(status_code=413, detail="文件必须是 10 MB 以内的有效 PDF")
+        analysis_id = uuid.uuid4().hex
+        temp_path = None
+        try:
+            with tempfile.NamedTemporaryFile(suffix=".pdf", delete=False) as handle:
+                handle.write(content)
+                temp_path = handle.name
+            record = parse_transcript_pdf(Path(temp_path))
+            request.app.state.transcripts[analysis_id] = record.model_dump()
+            return {"analysis_id": analysis_id, **record.model_dump()}
+        except Exception as exc:
+            raise HTTPException(status_code=422, detail=f"成绩单解析失败：{exc}") from exc
+        finally:
+            if temp_path:
+                Path(temp_path).unlink(missing_ok=True)
+
+    @app.post("/graduation/check")
+    async def graduation_check(payload: dict[str, Any], request: Request) -> dict[str, Any]:
+        analysis_id = str(payload.get("analysis_id", ""))
+        raw = request.app.state.transcripts.get(analysis_id)
+        if not raw:
+            raise HTTPException(status_code=404, detail="成绩单分析已过期，请重新上传")
+        programme = payload.get("programme") or raw.get("programme")
+        admission_year = payload.get("admission_year") or raw.get("admission_year")
+        if not programme or not admission_year:
+            raise HTTPException(status_code=422, detail="请确认专业和入学年份")
+        rules_path = settings.data_dir / "graduation_requirements.json"
+        if not rules_path.exists():
+            raise HTTPException(status_code=503, detail="尚未配置毕业要求规则库")
+        rules = json.loads(rules_path.read_text(encoding="utf-8"))
+        year_start = rules.get("admission_year_start", 0)
+        year_end = rules.get("admission_year_end", 9999)
+        if not _programme_matches(str(programme), rules) or not (year_start <= int(admission_year) <= year_end):
+            raise HTTPException(status_code=422, detail="没有找到该专业和入学年份对应的修读计划")
+        canonical_programme = rules["programme"]
+        report = check_graduation(TranscriptRecord(**raw), rules)
+        return {
+            "analysis_id": analysis_id,
+            "programme": canonical_programme,
+            "detected_programme": raw.get("programme"),
+            "admission_year": admission_year,
+            "scheme": rules,
+            **report,
+            "disclaimer": "结果仅供选课规划参考，以教务处最终审核为准。",
+        }
+
+    @app.delete("/transcripts/{analysis_id}")
+    async def delete_transcript(analysis_id: str, request: Request) -> dict[str, str]:
+        request.app.state.transcripts.pop(analysis_id, None)
+        return {"status": "deleted"}
 
     @app.post(
         "/chat",
