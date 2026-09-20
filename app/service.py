@@ -105,7 +105,12 @@ class QAService:
         self.retriever = retriever
         self.generator = generator
 
-    def ask(self, question: str, history: list[ChatHistoryMessage] | None = None) -> ChatResponse:
+    def ask(
+        self,
+        question: str,
+        history: list[ChatHistoryMessage] | None = None,
+        connection: ModelConnection | None = None,
+    ) -> ChatResponse:
         clean_question = question.strip()
         recent_history = (history or [])[-6:]
         previous_user_questions = [item.content for item in recent_history if item.role == "user"]

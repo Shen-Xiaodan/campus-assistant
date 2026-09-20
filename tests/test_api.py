@@ -3,11 +3,19 @@ from fastapi.testclient import TestClient
 from app.api import create_app
 from app.models import ChatResponse, SourceResponse
 
+MODEL = {
+    "provider": "openai-compatible",
+    "api_key": "test-key",
+    "base_url": "https://api.example.com/v1",
+    "model_id": "test-model",
+}
+
 
 class FakeService:
-    def ask(self, question: str, history) -> ChatResponse:
+    def ask(self, question: str, history, connection) -> ChatResponse:
         assert question == "学生证怎么补办？"
         assert history == []
+        assert connection.api_key.get_secret_value() == "test-key"
         return ChatResponse(
             answer="请向学生事务中心申请。【学生手册.pdf，第 12 页】",
             sources=[SourceResponse(document="学生手册.pdf", page=12, excerpt="学生证补办流程", score=0.82)],
@@ -17,7 +25,7 @@ class FakeService:
 
 def test_chat_api_response_structure():
     with TestClient(create_app(service=FakeService())) as client:
-        response = client.post("/chat", json={"question": "学生证怎么补办？"})
+        response = client.post("/chat", json={"question": "学生证怎么补办？", "model": MODEL})
     assert response.status_code == 200
     assert response.json() == {
         "answer": "请向学生事务中心申请。【学生手册.pdf，第 12 页】",
@@ -36,13 +44,13 @@ def test_chat_api_response_structure():
 
 def test_chat_api_validates_empty_question():
     with TestClient(create_app(service=FakeService())) as client:
-        response = client.post("/chat", json={"question": ""})
+        response = client.post("/chat", json={"question": "", "model": MODEL})
     assert response.status_code == 422
 
 
 def test_chat_api_passes_recent_history_to_service():
     class HistoryService:
-        def ask(self, question, history):
+        def ask(self, question, history, connection):
             assert question == "还有哪些？"
             assert [(item.role, item.content) for item in history] == [
                 ("user", "金融学有哪些必修课？"),
@@ -52,6 +60,7 @@ def test_chat_api_passes_recent_history_to_service():
 
     payload = {
         "question": "还有哪些？",
+        "model": MODEL,
         "history": [
             {"role": "user", "content": "金融学有哪些必修课？"},
             {"role": "assistant", "content": "目前能确认 FIN2020。"},

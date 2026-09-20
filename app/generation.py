@@ -73,6 +73,20 @@ class OpenAICompatibleChatModel:
             raise GenerationUnavailableError(f"OpenAI-compatible 模型调用失败{suffix}") from exc
 
 
+def model_from_connection(connection: ModelConnection, timeout: float) -> OpenAICompatibleChatModel:
+    """Build a request-scoped client so credentials are never shared across users."""
+    return OpenAICompatibleChatModel(
+        api_key=connection.api_key.get_secret_value(),
+        base_url=connection.base_url,
+        model=connection.model_id,
+        timeout=timeout,
+    )
+
+
+def check_model_connection(connection: ModelConnection, timeout: float = 20.0) -> None:
+    model_from_connection(connection, timeout).invoke("请只回复 OK。")
+
+
 def citation_label(document: str, page: int | None, section: str | None = None) -> str:
     if page is not None:
         return f"【{document}，第 {page} 页】"
@@ -157,7 +171,9 @@ class AnswerGenerator:
         self.settings = settings
         self.model = model
 
-    def _get_model(self) -> TextGenerator:
+    def _get_model(self, connection: ModelConnection | None = None) -> TextGenerator:
+        if connection is not None:
+            return model_from_connection(connection, self.settings.llm_timeout)
         if self.model is not None:
             return self.model
         if self.settings.llm_provider in {"siliconflow", "nvidia", "openai", "openai-compatible"}:
@@ -191,6 +207,7 @@ class AnswerGenerator:
         question: str,
         evidence: list[RetrievedEvidence],
         history: list[ChatHistoryMessage] | None = None,
+        connection: ModelConnection | None = None,
     ) -> ChatResponse:
         refusal = REFUSAL_ANSWER_EN if detect_language(question) == "en" else REFUSAL_ANSWER
         mode = classify_query(question)
