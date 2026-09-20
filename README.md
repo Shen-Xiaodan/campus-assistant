@@ -1,112 +1,92 @@
-# 校园知识问答助手
+# Campus Knowledge Assistant
 
-面向高校规章、学生手册、培养方案和学校官网的 RAG（检索增强生成）项目。系统从已收录资料中检索证据，生成带页码或官网链接的回答；资料不足时明确拒答，避免依赖模型自身知识猜测。
+A RAG project for university regulations, student handbooks, study schemes, and official university websites. It retrieves evidence from indexed sources, generates answers with page numbers or source links, and explicitly refuses when evidence is insufficient.
 
-项目还提供港中深本科生成绩单解析与毕业要求匹配功能：用户可临时上传电子成绩单，确认专业和入学年份，并查看已完成、在修和缺失课程。成绩单不会加入知识库。
+The project also provides transcript parsing and graduation-requirement matching for CUHK-Shenzhen undergraduate students. Users can temporarily upload an electronic transcript, confirm their programme and admission year, and review completed, in-progress, and missing courses. Transcripts are never added to the knowledge base.
 
-本项目由开源项目 `DeepShah1406/College_RAG_Chatbot` 重构而来，重点是清晰、可测试、可评测的端到端 RAG 工程。
+## Interface
 
-## 界面
+![CUHK-Shenzhen Campus Assistant](docs/ui-preview.jpg)
 
-![港中深校园助手交互页面](docs/ui-preview.jpg)
+## Features
 
-## 主要功能
+### Campus knowledge Q&A
 
-### 校园知识问答
+- Recursively ingest campus PDFs while preserving document and page metadata
+- Incrementally collect public content from allowlisted university websites
+- Build a persistent Chroma vector index and skip unchanged documents
+- Combine vector and keyword retrieval, with optional reranking
+- Support Chinese and English questions and common cross-language campus terms
+- Generate evidence-grounded answers with source citations
+- Refuse low-confidence questions instead of guessing
+- Provide FastAPI endpoints and a Streamlit chat interface
 
-- 批量导入校园 PDF，并保留文档名称和页码
-- 从白名单学校官网增量采集公开内容
-- Chroma 持久化向量索引，文档未变化时跳过重复处理
-- 向量与关键词混合检索，可选 reranker
-- 中英文提问、常见校园术语跨语言检索
-- 基于检索证据生成回答并展示引用
-- 低相关度时拒答，不调用模型猜测
-- FastAPI 接口与 Streamlit 对话界面
+### Transcript and graduation-requirement matching
 
-### 成绩单与毕业要求匹配
+- Upload, parse, and confirm transcript information in a dedicated dialog
+- Parse course codes, names, credits, grades, and terms from CUHK-Shenzhen electronic transcripts
+- Distinguish passed, in-progress, failed, and withdrawn courses
+- Support grade markers such as `PA`, `DI`, and `IP`
+- Filter page numbers, dates, Dean's List entries, academic-year labels, and other non-course text
+- Merge course names that wrap across lines
+- Summarize completed courses, courses in progress, and recognized credits
+- Match requirements by programme and admission year
+- Map English programme names to canonical names in the ruleset
+- Process transcripts temporarily without adding them to the RAG index
 
-- 在独立弹窗中上传、解析和确认成绩单信息
-- 解析港中深电子成绩单中的课程代码、名称、学分、成绩和学期
-- 区分已完成、在修、失败和退课状态
-- 支持 `PA`、`DI`、`IP` 等港中深成绩标记
-- 过滤页码、日期、Dean's List、Academic Year 等非课程内容
-- 支持跨行课程名称
-- 统计已完成课程、在修课程和已识别学分
-- 按专业及入学年份匹配毕业要求
-- 支持英文专业名称映射到规则库标准名称
-- 文件仅用于当前服务进程中的临时分析，不会进入 RAG 索引
+The current ruleset covers Computer Science and Technology for the 2023 admission year. Additional programmes and years require additional rules.
 
-当前规则库包含“计算机科学与技术”专业、2023 年入学版本。其他专业和年份需要补充对应规则。
-
-## 系统架构
+## Architecture
 
 ```mermaid
 flowchart LR
-    subgraph ingestion[离线知识库]
-        PDF[校园 PDF] --> Parse[解析与切分]
-        Web[学校官网] --> Parse
-        Parse --> Embed[向量化]
-        Embed --> Chroma[(Chroma)]
-    end
-
-    subgraph qa[校园问答]
-        UI[Streamlit] --> API[FastAPI]
-        API --> Retrieve[混合检索]
-        Chroma --> Retrieve
-        Retrieve --> Answer[证据约束回答或拒答]
-        Answer --> UI
-    end
-
-    subgraph transcript[成绩单匹配]
-        Upload[临时上传 PDF] --> Extract[课程表解析]
-        Extract --> Rules[毕业要求规则]
-        Rules --> Report[匹配报告]
-        Report --> UI
-    end
+    PDF[Campus PDFs] --> Parse[Parse and split]
+    Web[Official websites] --> Parse
+    Parse --> Chroma[(Chroma index)]
+    UI[Streamlit] --> API[FastAPI]
+    API --> Retrieve[Hybrid retrieval]
+    Chroma --> Retrieve
+    Retrieve --> Answer[Grounded answer or refusal]
+    Answer --> UI
+    Upload[Temporary transcript upload] --> Extract[Course-table parser]
+    Extract --> Rules[Graduation rules]
+    Rules --> Report[Matching report]
+    Report --> UI
 ```
 
-知识问答和成绩单分析相互独立：成绩单不会写入 Chroma，也不会成为后续问答的检索材料。
+Knowledge Q&A and transcript analysis are separate flows. Transcript data is not written to Chroma and cannot become evidence for later questions.
 
-## 代码结构
+## Repository structure
 
-```text
-app/
-├── api.py                   # FastAPI 接口
-├── ui.py                    # Streamlit 界面
-├── config.py                # 环境变量与配置
-├── documents.py             # 校园 PDF 解析与切分
-├── transcript.py            # 成绩单解析与毕业要求检查
-├── retrieval.py             # 混合检索、过滤与去重
-├── generation.py            # 证据约束回答与引用
-├── service.py               # 问答流程编排
-├── index.py                 # PDF 增量索引
-├── web_documents.py         # 官网内容提取
-├── web_index.py             # 官网增量索引
-├── ingest.py                # PDF 索引命令
-├── ingest_web.py            # 官网采集命令
-└── evaluate.py              # 离线评测
-data/
-├── graduation_requirements.json  # 毕业要求规则
-├── study_schemes/                # 培养方案及清单
-└── web_sources.json              # 官网白名单配置
-evaluation/                        # 离线评测数据
-tests/                             # 自动化测试
-vector_db_dir/                     # 本地向量索引
-```
+The main application modules are:
 
-## 技术栈
+- `app/api.py`: FastAPI endpoints
+- `app/ui.py`: Streamlit interface
+- `app/documents.py`: campus PDF parsing and splitting
+- `app/transcript.py`: transcript parsing and requirement checks
+- `app/retrieval.py`: hybrid retrieval, filtering, and deduplication
+- `app/generation.py`: grounded answers and citations
+- `app/index.py`: incremental PDF indexing
+- `app/web_documents.py` and `app/web_index.py`: website extraction and indexing
+- `app/ingest.py` and `app/ingest_web.py`: indexing commands
+- `app/evaluate.py`: offline evaluation
+- `data/`: graduation rules, study schemes, and website allowlist
+- `tests/`: automated tests
+- `vector_db_dir/`: local vector index
+
+## Tech stack
 
 - Python 3.10+
-- FastAPI、Pydantic、Uvicorn
+- FastAPI, Pydantic, and Uvicorn
 - Streamlit
-- LangChain、Chroma、Sentence Transformers
+- LangChain, Chroma, and Sentence Transformers
 - OpenAI-compatible Chat API
-- pypdf、Beautiful Soup
-- pytest、Ruff
+- pypdf and Beautiful Soup
+- pytest and Ruff
 
-## 快速开始
+## Quick start
 
-### 1. 安装依赖
+### Install dependencies
 
 ```bash
 python3 -m venv .venv
@@ -115,98 +95,81 @@ pip install -r requirements.txt
 cp .env.example .env
 ```
 
-在 `.env` 中配置模型服务。至少需要设置 `LLM_API_KEY`，并根据供应商确认 `LLM_PROVIDER`、`LLM_BASE_URL` 和 `LLM_MODEL_ID`。
+Configure the model service in `.env`. At minimum, set `LLM_API_KEY` and verify `LLM_PROVIDER`, `LLM_BASE_URL`, and `LLM_MODEL_ID`. Never commit real API keys.
 
-不要把真实密钥提交到仓库。
+### Build the campus knowledge index
 
-### 2. 构建校园资料索引
-
-把 PDF 放入 `data/` 或其子目录，然后执行：
+Place PDFs in `data/` or one of its subdirectories, then run:
 
 ```bash
 python -m app.ingest
 ```
 
-也可以指定其他资料目录：
+To use another source directory:
 
 ```bash
 python -m app.ingest --source /path/to/campus-pdfs
 ```
 
-如需下载指定入学年份的港中深主修修读计划：
+To download CUHK-Shenzhen study schemes for a specific admission year:
 
 ```bash
 python -m app.crawl_study_schemes --year 2023
 python -m app.ingest
 ```
 
-### 3. 可选：采集学校官网
+### Optional: ingest official websites
 
-编辑 `data/web_sources.json`，为每个来源设置入口 URL、允许域名和允许路径，然后执行：
+Configure `data/web_sources.json` with an entry URL, allowed domains, and allowed paths, then run:
 
 ```bash
 python -m app.ingest_web
 ```
 
-采集器只访问白名单范围，并对未变化页面执行增量跳过。
+The crawler stays within the allowlisted scope and skips unchanged pages.
 
-### 4. 启动服务
+### Start the services
 
-打开两个终端并激活虚拟环境。
-
-终端一：
+Use two terminals with the virtual environment activated:
 
 ```bash
 uvicorn app.api:app --reload
 ```
 
-终端二：
-
 ```bash
 streamlit run app/ui.py
 ```
 
-默认地址：
+The default frontend is `http://localhost:8501`; API documentation is at `http://127.0.0.1:8000/docs`. Set `API_URL` to point the frontend to another API address.
 
-- 前端：`http://localhost:8501`
-- API 文档：`http://127.0.0.1:8000/docs`
+## Using transcript matching
 
-可通过 `API_URL` 修改前端连接的 API 地址。
+1. Click **Upload and parse transcript** in the sidebar.
+2. Select a PDF up to 10 MB.
+3. Confirm the detected programme, admission year, course count, and credits.
+4. Expand the course details and check terms, grades, and statuses.
+5. Click **Generate matching report**.
 
-## 使用成绩单匹配
-
-1. 在左侧栏点击“上传并解析成绩单”。
-2. 选择 10 MB 以内的 PDF。
-3. 确认识别到的专业、入学年份、课程数量和学分。
-4. 展开课程明细，检查学期、成绩及状态。
-5. 点击“生成匹配报告”。
-
-当前解析器针对具有以下表头的港中深电子成绩单：
+The parser currently targets CUHK-Shenzhen electronic transcripts with a table header like:
 
 ```text
 Course Code | Course Title | Units | Grade | % of A- and above
 ```
 
-为保护隐私：
+Privacy safeguards:
 
-- 上传文件使用临时文件处理，完成后删除
-- 成绩单不会加入校园知识库
-- 测试夹具不包含真实姓名、学号或证件信息
-- 报告仅供选课规划参考，以教务处最终审核为准
+- Uploaded files are processed through temporary files and removed afterward.
+- Transcripts are not added to the campus knowledge base.
+- Test fixtures contain no real names, student IDs, or identity-document numbers.
+- Reports are for course-planning reference only; the Registry's final review prevails.
 
-## 配置
+## Configuration
 
-所有环境变量示例见 `.env.example`。常用配置包括：
+See `.env.example` for all environment variables. Common settings include the model provider and endpoint, data and index directories, embedding model, retrieval thresholds, optional reranking, and the frontend API address.
 
-- 模型供应商、接口地址、模型名称和 API Key
-- 数据目录和索引目录
-- Embedding 模型
-- 检索数量、相关度阈值和可选 reranker
-- 前端访问的 API 地址
+Rebuild the index after changing the embedding model or text-splitting parameters.
 
-修改 Embedding 模型或文本切分参数后，应重新构建索引。
-
-## 测试与评测
+## Tests and evaluation
 
 ```bash
 pip install -r requirements-dev.txt
@@ -215,27 +178,27 @@ ruff check .
 python -m app.evaluate
 ```
 
-单元测试使用 fake/mock，不需要付费模型 Key。离线评测覆盖检索命中、引用页码、拒答和响应时间；它用于开发回归，不替代真实资料上的人工评估。
+Unit tests use fakes and mocks, so paid model keys are not required. Offline evaluation covers retrieval hits, cited pages, refusal behavior, and response time. It is intended for regression testing and does not replace evaluation on real institutional data.
 
-## 当前限制
+## Current limitations
 
-- 成绩单暂不支持 OCR；扫描版 PDF 需要先转换为带文字层的可搜索 PDF
-- 当前成绩单表格解析针对港中深电子成绩单，其他学校格式需要独立适配
-- 当前毕业要求规则只覆盖计算机科学与技术专业 2023 年入学版本
-- 交换、豁免、大学核心课程和方向要求中部分项目仍需人工核验
-- 官网采集不执行 JavaScript，动态渲染页面可能无法提取正文
-- 从数据目录删除 PDF 后，旧向量不会自动清理
-- 聊天历史不跨会话保存
-- 模型回答仍可能存在措辞偏差，应以引用的原始资料为准
+- OCR is not included; scanned PDFs must first be converted into searchable PDFs.
+- Transcript parsing currently targets CUHK-Shenzhen electronic transcripts; other institutions need separate adapters.
+- Graduation rules currently cover only Computer Science and Technology for the 2023 admission year.
+- Exchange credits, exemptions, university-core requirements, and specialization requirements may still require manual review.
+- Website ingestion does not execute JavaScript, so dynamically rendered pages may not yield usable text.
+- Removing a PDF from the data directory does not automatically remove its old vectors.
+- Chat history is not persisted across sessions.
+- Model wording may still be imperfect; verify answers against the cited source documents.
 
-## 后续方向
+## Roadmap
 
-- 增加更多专业和入学年份的毕业要求规则
-- 为其他学校成绩单增加独立解析模板
-- 接入 OCR 和版面感知解析
-- 增加索引删除同步与管理员导入状态页面
-- 使用更完整的真实评测集持续调优检索
+- Add graduation rules for more programmes and admission years
+- Add independent transcript adapters for other institutions
+- Add OCR and layout-aware parsing
+- Add index deletion synchronization and an administrator import-status page
+- Tune retrieval against larger, representative evaluation sets
 
-## 致谢与许可证
+## Acknowledgements and license
 
-感谢原始开源项目 [`DeepShah1406/College_RAG_Chatbot`](https://github.com/DeepShah1406/College_RAG_Chatbot) 提供基础实现思路。本项目沿用仓库中的 MIT License，详见 [LICENSE](LICENSE)。
+Thanks to [`DeepShah1406/College_RAG_Chatbot`](https://github.com/DeepShah1406/College_RAG_Chatbot) for the original implementation ideas. This project follows the repository's MIT License; see [LICENSE](LICENSE).
