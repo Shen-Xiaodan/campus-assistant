@@ -95,7 +95,19 @@ pip install -r requirements.txt
 cp .env.example .env
 ```
 
-Configure the model service in `.env`. At minimum, set `LLM_API_KEY` and verify `LLM_PROVIDER`, `LLM_BASE_URL`, and `LLM_MODEL_ID`. Never commit real API keys.
+Configure the model service in `.env`. The backend reads the model provider, API key, endpoint, and model name when it starts. Model credentials are not entered in the Streamlit interface and are not accepted in `/chat` requests.
+
+For the default SiliconFlow configuration:
+
+```dotenv
+LLM_PROVIDER=siliconflow
+LLM_API_KEY=your-api-key
+LLM_BASE_URL=https://api.siliconflow.cn/v1
+LLM_MODEL_ID=Qwen/Qwen3-32B
+LLM_TIMEOUT=300
+```
+
+`LLM_PROVIDER` supports `siliconflow`, `nvidia`, `openai`, `openai-compatible`, and `groq`. OpenAI-compatible providers require both `LLM_API_KEY` and `LLM_BASE_URL`. Groq can use `GROQ_API_KEY` instead. Never commit real API keys.
 
 ### Build the campus knowledge index
 
@@ -138,10 +150,25 @@ uvicorn app.api:app --reload
 
 ```bash
 source .venv/bin/activate
-streamlit run app/ui.pystreamlit run app/ui.py
+streamlit run app/ui.py
 ```
 
 The default frontend is `http://localhost:8501`; API documentation is at `http://127.0.0.1:8000/docs`. Set `API_URL` to point the frontend to another API address.
+
+### Call the chat API directly
+
+The `/chat` endpoint accepts a question and optional recent conversation history. The server always uses the model configured in `.env`; clients do not send API keys, endpoints, or model names.
+
+```bash
+curl -X POST http://127.0.0.1:8000/chat \
+  -H 'Content-Type: application/json' \
+  -d '{
+    "question": "学生证丢失后应该如何补办？",
+    "history": []
+  }'
+```
+
+After changing any `LLM_*` or `GROQ_API_KEY` value, restart the FastAPI process so the new configuration is loaded.
 
 ## Using transcript matching
 
@@ -166,7 +193,21 @@ Privacy safeguards:
 
 ## Configuration
 
-See `.env.example` for all environment variables. Common settings include the model provider and endpoint, data and index directories, embedding model, retrieval thresholds, optional reranking, and the frontend API address.
+See `.env.example` for all environment variables. Common settings include:
+
+- `LLM_PROVIDER`: model provider; defaults to the value shown in `.env.example`
+- `LLM_API_KEY`: server-side API key for OpenAI-compatible providers
+- `LLM_BASE_URL`: OpenAI-compatible API base URL, without `/chat/completions`
+- `LLM_MODEL_ID`: model identifier sent to the provider
+- `LLM_TIMEOUT`: model request timeout in seconds
+- `GROQ_API_KEY`: optional Groq-specific API key
+- `DATA_DIR` and `INDEX_DIR`: source-document and vector-index directories
+- `EMBEDDING_MODEL`: embedding model used to build and query the index
+- `TOP_K`, `FETCH_K`, and `SIMILARITY_THRESHOLD`: retrieval behavior
+- `RERANKER_ENABLED` and `RERANKER_MODEL`: optional cross-encoder reranking
+- `API_URL`: FastAPI address used by the Streamlit frontend
+
+Model credentials belong only in the backend environment. Do not place them in frontend code, browser storage, chat payloads, or committed files.
 
 Rebuild the index after changing the embedding model or text-splitting parameters.
 
