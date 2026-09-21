@@ -2,7 +2,9 @@ import pytest
 from pydantic import ValidationError
 
 from app.tool_models import (
+    AgentRunResult,
     CompareSchemeVersionsArgs,
+    FinalAnswerDecision,
     GetCourseArgs,
     SearchKnowledgeArgs,
     ToolCall,
@@ -40,6 +42,12 @@ def test_tool_call_keeps_name_and_arguments_typed():
     call = ToolCall(name="search_knowledge", arguments={"query": "课程要求"})
     assert call.name == "search_knowledge"
     assert call.arguments["query"] == "课程要求"
+
+
+def test_agent_decision_models_validate_discriminated_actions():
+    assert FinalAnswerDecision(action="final", answer="完成").action == "final"
+    result = AgentRunResult(completed=False, stop_reason="max_steps")
+    assert result.steps == []
 
 
 def test_search_arguments_limit_result_count():

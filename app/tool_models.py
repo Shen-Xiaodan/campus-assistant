@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import Any
+from typing import Annotated, Any, Literal
 
 from pydantic import BaseModel, Field, field_validator
 
@@ -49,6 +49,35 @@ class ToolCall(BaseModel):
 
     name: str = Field(min_length=1, max_length=100)
     arguments: dict[str, Any] = Field(default_factory=dict)
+
+
+class ToolCallDecision(BaseModel):
+    action: Literal["call_tool"]
+    tool_call: ToolCall
+
+
+class FinalAnswerDecision(BaseModel):
+    action: Literal["final"]
+    answer: str = Field(min_length=1, max_length=12000)
+
+
+AgentDecision = Annotated[
+    ToolCallDecision | FinalAnswerDecision,
+    Field(discriminator="action"),
+]
+
+
+class AgentStep(BaseModel):
+    step_number: int = Field(ge=1, le=3)
+    tool_call: ToolCall
+    result: ToolResult
+
+
+class AgentRunResult(BaseModel):
+    answer: str | None = None
+    steps: list[AgentStep] = Field(default_factory=list)
+    completed: bool
+    stop_reason: Literal["final_answer", "max_steps", "planner_error", "tool_error"]
 
 
 class SearchKnowledgeArgs(BaseModel):

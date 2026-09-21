@@ -321,6 +321,10 @@ class CampusRetriever:
             )
         return results[: self.settings.top_k]
 
+    def find_course(self, course_code: str) -> list[RetrievedEvidence]:
+        """Return exact catalogue matches for one normalized course code."""
+        return self._catalog_lookup(course_code)
+
     @staticmethod
     def _evidence(document: Any, score: float) -> RetrievedEvidence:
         metadata = dict(getattr(document, "metadata", {}) or {})
