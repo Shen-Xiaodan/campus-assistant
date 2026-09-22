@@ -20,6 +20,7 @@ The project also provides transcript parsing and graduation-requirement matching
 - Generate evidence-grounded answers with source citations
 - Refuse low-confidence questions instead of guessing
 - Provide FastAPI endpoints and a Streamlit chat interface
+- Use a bounded tool calling agent for study scheme comparisons across admission years; other questions use the existing RAG flow
 
 ### Transcript and graduation-requirement matching
 
@@ -158,6 +159,8 @@ The default frontend is `http://localhost:8501`; API documentation is at `http:/
 ### Call the chat API directly
 
 The `/chat` endpoint accepts a question and optional recent conversation history. The server always uses the model configured in `.env`; clients do not send API keys, endpoints, or model names.
+
+Questions comparing two or more explicit admission years can invoke the read-only knowledge tools. The agent may make up to three tool calls; the final answer is generated from returned evidence and checked for citations. If planning or a tool fails, the request falls back to the existing RAG service. No extra API fields are required.
 
 ```bash
 curl -X POST http://127.0.0.1:8000/chat \

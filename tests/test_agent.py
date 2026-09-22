@@ -62,10 +62,18 @@ def test_agent_finishes_after_tool_call_and_final_decision():
 def test_agent_stops_after_three_tool_calls():
     planner = SequencePlanner([call("1"), call("2"), call("3"), FinalAnswerDecision(action="final", answer="不应调用")])
     result = controller(planner).run("测试")
+    assert result.completed is True
+    assert result.stop_reason == "final_answer"
+    assert len(result.steps) == 3
+    assert len(planner.seen_steps) == 4
+
+
+def test_agent_refuses_fourth_tool_call():
+    planner = SequencePlanner([call("1"), call("2"), call("3"), call("4")])
+    result = controller(planner).run("测试")
     assert result.completed is False
     assert result.stop_reason == "max_steps"
     assert len(result.steps) == 3
-    assert len(planner.seen_steps) == 3
 
 
 def test_agent_rejects_duplicate_tool_calls_without_executing_again():

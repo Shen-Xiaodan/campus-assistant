@@ -7,9 +7,10 @@ planner decides what to do, while the registry validates and executes tools.
 from __future__ import annotations
 
 import json
+import logging
 from typing import Protocol
 
-from pydantic import ValidationError
+from pydantic import TypeAdapter
 
 from app.models import ChatHistoryMessage
 from app.tool_models import (
@@ -18,11 +19,14 @@ from app.tool_models import (
     AgentStep,
     FinalAnswerDecision,
     ToolCall,
+    ToolDefinition,
     ToolResult,
 )
 from app.tool_registry import ToolRegistry
 
 MAX_TOOL_STEPS = 3
+_DECISION_ADAPTER = TypeAdapter(AgentDecision)
+logger = logging.getLogger(__name__)
 
 
 class AgentPlanner(Protocol):
@@ -30,7 +34,7 @@ class AgentPlanner(Protocol):
         self,
         question: str,
         history: list[ChatHistoryMessage],
-        tools: list,
+        tools: list[ToolDefinition],
         steps: list[AgentStep],
     ) -> AgentDecision:
         ...
@@ -63,21 +67,16 @@ class AgentController:
         steps: list[AgentStep] = []
         fingerprints: set[str] = set()
 
-        for step_number in range(1, self.max_tool_steps + 1):
+        for step_number in range(1, self.max_tool_steps + 2):
             try:
-                decision = self.planner.decide(
+                decision = _DECISION_ADAPTER.validate_python(self.planner.decide(
                     question=question,
                     history=recent_history,
                     tools=self.registry.definitions(),
                     steps=steps,
-                )
-            except (ValidationError, ValueError, TypeError):
-                return AgentRunResult(
-                    steps=steps,
-                    completed=False,
-                    stop_reason="planner_error",
-                )
-            except Exception:
+                ))
+            except Exception as exc:
+                logger.warning("agent_planner_failed step=%d error_type=%s", step_number, type(exc).__name__)
                 return AgentRunResult(
                     steps=steps,
                     completed=False,
@@ -91,6 +90,9 @@ class AgentController:
                     completed=True,
                     stop_reason="final_answer",
                 )
+
+            if step_number > self.max_tool_steps:
+                break
 
             tool_call = decision.tool_call
             fingerprint = tool_call_fingerprint(tool_call)
@@ -111,6 +113,13 @@ class AgentController:
                     tool_call=tool_call,
                     result=result,
                 )
+            )
+            logger.info(
+                "agent_tool_completed step=%d tool=%s success=%s evidence=%d",
+                step_number,
+                tool_call.name,
+                result.success,
+                len(result.evidence),
             )
 
         return AgentRunResult(

@@ -186,6 +186,10 @@ class AnswerGenerator:
         )
         return self.model
 
+    def get_model(self) -> TextGenerator:
+        """Return the configured model for answer generation and planning."""
+        return self._get_model()
+
     def answer(
         self,
         question: str,

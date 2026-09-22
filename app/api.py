@@ -14,10 +14,14 @@ from typing import Any
 from fastapi import FastAPI, File, HTTPException, Request, UploadFile
 from fastapi.responses import JSONResponse
 
+from app.agent import AgentController
+from app.agent_planner import LLMToolPlanner
+from app.agent_service import AgentQAService
 from app.config import Settings
 from app.exceptions import CampusAssistantError, IndexUnavailableError
 from app.generation import AnswerGenerator
 from app.index import MANIFEST_NAME, open_vectorstore
+from app.knowledge_tools import build_knowledge_tool_registry
 from app.logging_config import configure_logging
 from app.models import ChatRequest, ChatResponse
 from app.retrieval import CampusRetriever
@@ -33,7 +37,7 @@ def _programme_matches(value: str, rules: dict[str, Any]) -> bool:
     return normalized in {" ".join(str(option).casefold().split()) for option in accepted if option}
 
 
-def build_service(settings: Settings) -> QAService:
+def build_service(settings: Settings) -> AgentQAService:
     manifest = settings.index_dir / MANIFEST_NAME
     if not manifest.exists():
         raise IndexUnavailableError("尚未建立校园资料索引，请先运行 python -m app.ingest")
@@ -44,7 +48,12 @@ def build_service(settings: Settings) -> QAService:
     if not indexed_documents:
         raise IndexUnavailableError("校园资料索引为空，请先添加 PDF 并运行 python -m app.ingest")
     vectorstore = open_vectorstore(settings)
-    return QAService(CampusRetriever(vectorstore, settings), AnswerGenerator(settings))
+    retriever = CampusRetriever(vectorstore, settings)
+    generator = AnswerGenerator(settings)
+    fallback = QAService(retriever, generator)
+    planner = LLMToolPlanner(generator.get_model)
+    agent = AgentController(planner, build_knowledge_tool_registry(retriever))
+    return AgentQAService(agent, generator, fallback)
 
 
 def create_app(settings: Settings | None = None, service: Any | None = None) -> FastAPI:
